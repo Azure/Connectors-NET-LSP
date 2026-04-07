@@ -23,7 +23,12 @@ A Language Server Protocol (LSP) server and VS Code extension that provides inte
 dotnet build
 ```
 
-> **Note:** No test projects are currently defined. A `dotnet test` step will be added when tests are introduced.
+## Test
+```bash
+dotnet test
+```
+
+> **Note:** Some tests in `SdkIndexConstantDiscoveryTests` require a Connector SDK `.nupkg` in the `SDK/` directory and will be skipped if not present.
 
 ## Run the Server
 ```bash

@@ -214,19 +214,6 @@
         "focus": false,
         "panel": "shared"
       }
-    },
-    {
-      "label": "check-lsp-running",
-      "type": "shell",
-      "command": "${workspaceFolder}/get-lsp-pid.sh",
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "focus": false,
-        "panel": "shared",
-        "showReuseMessage": false
-      },
-      "problemMatcher": []
     }
   ]
 }

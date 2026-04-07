@@ -36,7 +36,13 @@ public static class NupkgLoader
                     continue;
                 }
 
-                string outPath = Path.Combine(extractRoot, entry.Name.Replace('/', Path.DirectorySeparatorChar));
+                string outPath = Path.GetFullPath(Path.Combine(extractRoot, entry.Name.Replace('/', Path.DirectorySeparatorChar)));
+                string normalizedRoot = Path.GetFullPath(extractRoot) + Path.DirectorySeparatorChar;
+                if (!outPath.StartsWith(normalizedRoot, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
                 using Stream input = zip.GetInputStream(entry);
                 using FileStream output = File.Create(outPath);
