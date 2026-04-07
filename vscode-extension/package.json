@@ -1,7 +1,7 @@
 {
   "name": "connector-sdk-intellisense",
-  "displayName": "Azure Logic Apps Connector SDK IntelliSense",
-  "description": "Provides IntelliSense, completions, and dynamic value suggestions for the Azure Logic Apps Connector SDK.",
+  "displayName": "Azure Connectors SDK IntelliSense",
+  "description": "Provides IntelliSense, completions, and dynamic value suggestions for the Azure Connectors SDK.",
   "version": "0.1.0",
   "publisher": "microsoft",
   "license": "MIT",

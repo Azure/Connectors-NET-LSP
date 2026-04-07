@@ -1,6 +1,6 @@
 # End-to-End Testing Guide
 
-Step-by-step instructions for setting up and running the Connector SDK LSP Server end-to-end with a real connector project.
+Step-by-step instructions for setting up and running the Connectors SDK LSP Server end-to-end with a real connector project.
 
 ---
 
@@ -8,13 +8,13 @@ Step-by-step instructions for setting up and running the Connector SDK LSP Serve
 
 This guide walks you through:
 
-1. Building the Connector SDK `.nupkg` from source
+1. Building the Connectors SDK `.nupkg` from source
 2. Staging the package for the LSP server
 3. Building and running the LSP server
 4. Installing the VS Code extension
 5. Opening a connector project and verifying LSP features (hover, completions, CodeLens)
 
-The guide uses the [azure-logicapps-connector-sdk](https://github.com/Azure/Connectors-NET-SDK) as the SDK source and the [azure-managed-connector-poc](https://github.com/Azure/Connectors-NET-LSP) as the test project. You can substitute any project that references the Connector SDK.
+The guide uses the [Connectors-NET-SDK](https://github.com/Azure/Connectors-NET-SDK) as the SDK source and the [azure-managed-connector-poc](https://github.com/Azure/Connectors-NET-LSP) as the test project. You can substitute any project that references the Connectors SDK.
 
 ---
 
@@ -35,7 +35,7 @@ Clone these repos side by side (the relative paths don't matter, but they make l
 ```
 your-workspace/
   connector-sdk-lsp/          # This repo (LSP server + VS Code extension)
-  azure-logicapps-connector-sdk/  # Connector SDK source
+  Connectors-NET-SDK/  # Connectors SDK source
   azure-managed-connector-poc/    # Test project (DirectConnector)
 ```
 
@@ -47,12 +47,12 @@ git clone https://github.com/Azure/Connectors-NET-LSP.git
 
 ---
 
-## Step 1: Build the Connector SDK NuGet Package
+## Step 1: Build the Connectors SDK NuGet Package
 
-The Connector SDK project has `GeneratePackageOnBuild=true`, so a Release build produces the `.nupkg` automatically.
+The Connectors SDK project has `GeneratePackageOnBuild=true`, so a Release build produces the `.nupkg` automatically.
 
 ```bash
-cd azure-logicapps-connector-sdk
+cd Connectors-NET-SDK
 dotnet build src/Microsoft.Azure.Workflows.Connectors.Sdk/Microsoft.Azure.Workflows.Connectors.Sdk.csproj -c Release
 ```
 
@@ -72,7 +72,7 @@ The VS Code extension discovers `.nupkg` files from `SDK/` under the opened work
 not from the LSP repo itself.
 
 ```bash
-cp azure-logicapps-connector-sdk/src/Microsoft.Azure.Workflows.Connectors.Sdk/bin/Release/Microsoft.Azure.Workflows.Connectors.Sdk.1.0.0.nupkg azure-managed-connector-poc/SDK/
+cp Connectors-NET-SDK/src/Microsoft.Azure.Workflows.Connectors.Sdk/bin/Release/Microsoft.Azure.Workflows.Connectors.Sdk.1.0.0.nupkg azure-managed-connector-poc/SDK/
 ```
 
 Alternatively, set the `connectorSdk.sdkNupkgPath` VS Code setting to the absolute path of the `.nupkg`.
@@ -201,7 +201,7 @@ That's all. Both the Functions runtime and the LSP server pick up your Azure CLI
 
 > The template file includes commented-out `__Connectors:{name}:ManagedIdentityClientId` keys. Remove the `__` prefix to activate MSI for a connector.
 
-Once saved, the extension picks up the file automatically — check the **Output** panel (**View → Output** → select **"Connector SDK LSP"**) for:
+Once saved, the extension picks up the file automatically — check the **Output** panel (**View → Output** → select **"Connectors SDK LSP"**) for:
 ```
 Pushed merged connection update (triggered by .../local.settings.json)
 ```
@@ -271,13 +271,13 @@ Even without `[DynamicValues]`, the server infers dynamic operations for certain
 | `teamId` / `team_id` | `GetAllTeams` | Microsoft Teams |
 | `channelId` / `channel_id` | `GetChannelsForGroup` | Microsoft Teams |
 
-> If dynamic values show an empty list or an error, check: (1) `az login` is current, (2) the connection URL points to a valid API Hub connection with appropriate permissions, (3) the **Connector SDK LSP** output panel for error details.
+> If dynamic values show an empty list or an error, check: (1) `az login` is current, (2) the connection URL points to a valid API Hub connection with appropriate permissions, (3) the **Connectors SDK LSP** output panel for error details.
 
 ### Completions
 
 Start typing inside a method body. The LSP provides:
 
-- SDK symbol completions (types, methods, properties from the Connector SDK assembly)
+- SDK symbol completions (types, methods, properties from the Connectors SDK assembly)
 - Context-aware suggestions based on Roslyn analysis of the open file
 
 ### CodeLens
@@ -288,7 +288,7 @@ Look for CodeLens annotations above method declarations. These provide quick act
 
 ## Step 6: Verify via Output Panel
 
-The extension's output channel (**Connector SDK LSP**) shows diagnostic information:
+The extension's output channel (**Connectors SDK LSP**) shows diagnostic information:
 
 ```
 Starting LSP server from: .../Server/bin/Debug/net8.0/SdkLspServer.dll
@@ -337,7 +337,7 @@ Then reload the Extension Development Host (**Ctrl+Shift+P** → "Developer: Rel
 
 ### No hover/completions appear
 
-1. Verify the server started: check the **Connector SDK LSP** output channel
+1. Verify the server started: check the **Connectors SDK LSP** output channel
 2. Ensure the file is a `.cs` file (the extension registers for the `csharp` language)
 3. Check that C# extension (OmniSharp or C# Dev Kit) isn't conflicting — the LSP server provides its own hover/completion, which may coexist or conflict depending on editor configuration
 
@@ -353,18 +353,18 @@ Then reload the Extension Development Host (**Ctrl+Shift+P** → "Developer: Rel
 
 ## Rebuilding After SDK Changes
 
-When you make changes to the Connector SDK source:
+When you make changes to the Connectors SDK source:
 
 ```bash
 # 1. Rebuild the SDK package
-cd azure-logicapps-connector-sdk
+cd Connectors-NET-SDK
 dotnet build src/Microsoft.Azure.Workflows.Connectors.Sdk/Microsoft.Azure.Workflows.Connectors.Sdk.csproj -c Release
 
 # 2. Copy the updated package
 cp src/Microsoft.Azure.Workflows.Connectors.Sdk/bin/Release/Microsoft.Azure.Workflows.Connectors.Sdk.1.0.0.nupkg ../connector-sdk-lsp/SDK/
 
 # 3. Restart the LSP server (in the Extension Development Host)
-#    Ctrl+Shift+P → "Connector SDK: Restart Language Server"
+#    Ctrl+Shift+P → "Connectors SDK: Restart Language Server"
 #    Or reload the window: Ctrl+Shift+P → "Developer: Reload Window"
 ```
 
@@ -406,5 +406,5 @@ Then reload the Extension Development Host window.
 | Install extension deps | `cd vscode-extension && npm install` |
 | Launch extension (dev) | F5 in VS Code with `vscode-extension/` open |
 | Package VSIX | `dotnet publish Server -c Release -o vscode-extension/server && cd vscode-extension && npx @vscode/vsce package` |
-| Restart server | Ctrl+Shift+P → "Connector SDK: Restart Language Server" |
-| Check server logs | View → Output → "Connector SDK LSP" |
+| Restart server | Ctrl+Shift+P → "Connectors SDK: Restart Language Server" |
+| Check server logs | View → Output → "Connectors SDK LSP" |

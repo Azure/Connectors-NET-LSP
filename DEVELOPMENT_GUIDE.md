@@ -1,6 +1,6 @@
 # LSP Server Development & Debugging Guide
 
-Complete guide for developing and debugging the Connector SDK LSP Server with automatic rebuild and breakpoint support.
+Complete guide for developing and debugging the Connectors LSP Server with automatic rebuild and breakpoint support.
 
 ---
 
