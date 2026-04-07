@@ -159,7 +159,7 @@ This produces a `.vsix` file. Install it in VS Code via **Extensions → ... →
 
 ### Set Up Connection Entries
 
-The POC project includes a `local.settings.json.template`. Copy it to create a real settings file so the extension can detect DirectClient connections:
+The sample project includes a `local.settings.json.template`. Copy it to create a real settings file so the extension can detect DirectClient connections:
 
 ```bash
 cd Connectors-NET-Samples/DirectConnector
@@ -184,7 +184,7 @@ Then edit `local.settings.json` and replace the placeholder values with real (or
 
 ### Authentication
 
-The DirectConnector POC uses `DefaultAzureCredential` to authenticate to API Hub. The LSP server uses the same credential chain for dynamic value resolution. For local testing, the simplest approach:
+The DirectConnector sample uses `DefaultAzureCredential` to authenticate to API Hub. The LSP server uses the same credential chain for dynamic value resolution. For local testing, the simplest approach:
 
 ```bash
 az login
