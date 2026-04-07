@@ -1,20 +1,20 @@
-# Azure Logic Apps Connector SDK — LSP Server
+# Azure Connectors SDK — LSP Server
 
-A Language Server Protocol (LSP) server and VS Code extension that provides intelligent code assistance for [Azure Logic Apps Connector SDK](https://github.com/Azure/Connectors-NET-SDK) development. Built with OmniSharp.Extensions.LanguageServer and Roslyn for comprehensive C# code analysis.
+A Language Server Protocol (LSP) server and VS Code extension that provides intelligent code assistance for [Azure Connectors SDK](https://github.com/Azure/Connectors-NET-SDK) development. Built with OmniSharp.Extensions.LanguageServer and Roslyn for comprehensive C# code analysis.
 
 ## Features
 - **Document Sync**: Real-time document tracking via thread-safe in-memory `BufferManager`
 - **Intelligent Hover**: Rich hover information with method signatures, documentation, and SDK-specific guidance following LSP standards
 - **CodeLens Integration**: Configurable code lenses for SDK methods with quick access to documentation and connection creation (command names set via `initializationOptions`)
 - **Completion**: Context-aware completions with dynamic value suggestions for connector operations
-- **SDK Assembly Analysis**: Automatic indexing and analysis of Connector SDK assemblies from `.nupkg` packages, plus Roslyn-based analysis of project code and its references (including DirectClient usage)
+- **SDK Assembly Analysis**: Automatic indexing and analysis of Connectors SDK assemblies from `.nupkg` packages, plus Roslyn-based analysis of project code and its references (including DirectClient usage)
 - **Connection Management**: Unified connection model supporting both managed API connections (`connections.json`) and DirectClient connections (`local.settings.json`), with runtime updates via LSP notifications
 - **VS Code Extension**: Bundled extension that discovers SDK packages, watches connection files for changes, and merges connections from multiple sources
 - **LSP Compliance**: Full compliance with Language Server Protocol standards for broad editor compatibility
 
 ## Requirements
 - .NET SDK 8.0+
-- A Connector SDK `.nupkg` (loaded automatically from `SDK/` directory or via `--sdk` argument)
+- A Connectors SDK `.nupkg` (loaded automatically from `SDK/` directory or via `--sdk` argument)
 - An LSP-compatible editor (VS Code recommended — a purpose-built extension is included)
 
 ## Build
@@ -28,7 +28,7 @@ dotnet build
 dotnet test
 ```
 
-> **Note:** Some tests in `SdkIndexConstantDiscoveryTests` require a Connector SDK `.nupkg` in the `SDK/` directory and will be skipped if not present.
+> **Note:** Some tests in `SdkIndexConstantDiscoveryTests` require a Connectors SDK `.nupkg` in the `SDK/` directory and will be skipped if not present.
 
 ## Run the Server
 ```bash
@@ -139,11 +139,11 @@ The included `vscode-extension/` provides a ready-to-use VS Code experience:
 - Discovers SDK packages and connection files in the workspace
 - Watches `connections.json` and `local.settings.json` for changes and sends merged updates to the server
 - Merges DirectClient connections from workspace configuration (e.g., `local.settings.json`)
-- Registers configurable CodeLens commands and Connector SDK settings
+- Registers configurable CodeLens commands and Connectors SDK settings
 
 ## End-to-End Testing
 
-See [Docs/E2E_TESTING_GUIDE.md](Docs/E2E_TESTING_GUIDE.md) for step-by-step instructions to build the Connector SDK `.nupkg`, stage it, and verify the full LSP experience with a real connector project.
+See [Docs/E2E_TESTING_GUIDE.md](Docs/E2E_TESTING_GUIDE.md) for step-by-step instructions to build the Connectors SDK `.nupkg`, stage it, and verify the full LSP experience with a real connector project.
 
 ## Development Notes
 - **Testing**: Run `dotnet test` from the repo root. Test project: `Server.Tests/`
