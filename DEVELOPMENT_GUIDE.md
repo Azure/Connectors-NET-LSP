@@ -300,7 +300,6 @@ Add to Watch panel:
 
 ## 📚 Additional Resources
 
-- **AGENT.md** - Repository architecture and context
 - **HTTPCLIENT_GUIDE.md** - HTTP client integration
 
 ---
