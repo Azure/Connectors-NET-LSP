@@ -22,7 +22,7 @@ public class SdkIndexConstantDiscoveryTests
             "..",
             "..",
             "SDK",
-            "Microsoft.Azure.Workflows.Connectors.Sdk.1.0.0.nupkg");
+            "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg");
 
         if (!File.Exists(nupkgPath))
         {
@@ -34,7 +34,7 @@ public class SdkIndexConstantDiscoveryTests
                 "..",
                 "..",
                 "SDK",
-                "Microsoft.Azure.Workflows.Connectors.Sdk.1.0.0.nupkg"));
+                "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg"));
         }
 
         sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);

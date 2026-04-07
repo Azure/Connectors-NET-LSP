@@ -16,7 +16,7 @@ public class DynamicSchemaCacheTests
             return;
         }
 
-        string? sdkDll = Directory.GetFiles(tempDir, "Microsoft.Azure.Workflows.Connectors.Sdk.dll", SearchOption.AllDirectories)
+        string? sdkDll = Directory.GetFiles(tempDir, "Microsoft.Azure.Connectors.Sdk.dll", SearchOption.AllDirectories)
             .FirstOrDefault();
 
         if (sdkDll == null)

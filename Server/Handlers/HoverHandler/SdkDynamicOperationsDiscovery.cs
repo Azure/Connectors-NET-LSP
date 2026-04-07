@@ -132,8 +132,7 @@ internal static partial class SdkDynamicOperationsDiscovery
 
         foreach (IAssemblySymbol? assemblySymbol in compilation.References.Select(r => compilation.GetAssemblyOrModuleSymbol(r) as IAssemblySymbol).Where(s => s != null)!)
         {
-            if (!assemblySymbol.Name.Contains("Workflows.Sdk", StringComparison.Ordinal) &&
-                !assemblySymbol.Name.Contains("Connectors.Sdk", StringComparison.Ordinal))
+            if (!assemblySymbol.Name.Contains("Connectors.Sdk", StringComparison.Ordinal))
             {
                 continue;
             }
