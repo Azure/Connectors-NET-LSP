@@ -1,0 +1,100 @@
+root = true
+
+# General formatting
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# code style and quality
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = true
+
+# Qualification
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# var usage
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+# Expression-level prefs
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+dotnet_style_prefer_inferred_tuple_names = true:suggestion
+dotnet_style_prefer_inferred_anonymous_type_member_names = true:suggestion
+dotnet_style_prefer_auto_properties = true:suggestion
+dotnet_style_prefer_compound_assignment = true:suggestion
+dotnet_style_prefer_simplified_interpolation = true:suggestion
+
+# Nullable and null checks
+dotnet_diagnostic.CS8600.severity = warning
+dotnet_diagnostic.CS8602.severity = warning
+dotnet_diagnostic.CS8603.severity = warning
+
+# Naming (simple defaults)
+dotnet_naming_rule.interfaces_should_start_with_i.severity = suggestion
+dotnet_naming_rule.interfaces_should_start_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_should_start_with_i.style = prefix_i_style
+
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbols.applicable_accessibilities = *
+dotnet_naming_symbols.interface_symbols.required_modifiers = 
+
+dotnet_naming_style.prefix_i_style.required_prefix = I
+dotnet_naming_style.prefix_i_style.capitalization = pascal_case
+
+# New lines and layout
+csharp_new_line_before_open_brace = all
+csharp_new_line_between_query_expression_clauses = true
+csharp_prefer_braces = when_multiline:suggestion
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
+
+# Using directives
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# File-scoped namespaces preference
+csharp_style_namespace_declarations = file_scoped:silent
+
+# StyleCop: disable XML docs by default to keep noise low during prototyping
+dotnet_diagnostic.SA0001.severity = none
+dotnet_diagnostic.SA1000.severity = warning
+dotnet_diagnostic.SA1101.severity = none
+dotnet_diagnostic.SA1200.severity = suggestion
+dotnet_diagnostic.SA1600.severity = none
+dotnet_diagnostic.SA1601.severity = none
+dotnet_diagnostic.SA1602.severity = none
+dotnet_diagnostic.SA1611.severity = none
+dotnet_diagnostic.SA1633.severity = none
+
+# StyleCop: disable member ordering rules (SA1201-SA1214)
+# These require manual reordering and are not auto-fixable by dotnet format
+dotnet_diagnostic.SA1201.severity = suggestion
+dotnet_diagnostic.SA1202.severity = suggestion
+dotnet_diagnostic.SA1204.severity = suggestion
+dotnet_diagnostic.SA1214.severity = suggestion
+
+# StyleCop: disable field access modifier rules
+dotnet_diagnostic.SA1401.severity = suggestion
+
+# Line length guidelines - shows visual vertical line at 120 characters
+# This is a modern standard for C# (Roslyn, ASP.NET Core, etc.)
+# Provides visual feedback without breaking builds
+[*.cs]
+guidelines = 120
+max_line_length = 120
+
+
+# SA1010: Opening square brackets should be spaced correctly
+dotnet_diagnostic.SA1010.severity = none

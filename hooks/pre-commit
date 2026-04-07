@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] Running dotnet format (auto-fix)..."
+FORMAT_AVAILABLE=0
+if command -v dotnet >/dev/null 2>&1; then
+  if dotnet format --version >/dev/null 2>&1; then
+    FORMAT_AVAILABLE=1
+  fi
+fi
+
+if [[ "$FORMAT_AVAILABLE" -eq 1 ]]; then
+  # Run formatter with proper severity levels to catch all issues
+  # This matches what CI expects
+  echo "[pre-commit] Running dotnet format --severity info..."
+  if ! dotnet format --severity info; then
+    echo "[pre-commit] dotnet format encountered errors. Aborting."
+    echo "If the tool is missing, install: dotnet tool install -g dotnet-format"
+    exit 1
+  fi
+  
+  # Also run style formatting to catch whitespace issues
+  echo "[pre-commit] Running dotnet format style --severity info..."
+  if ! dotnet format style --severity info; then
+    echo "[pre-commit] dotnet format style encountered errors."
+  fi
+
+  # If formatting changed files, auto-stage and continue
+  if ! git diff --quiet; then
+    echo "[pre-commit] ✅ Auto-formatted files; staging changes."
+    
+    # Show which files were formatted
+    CHANGED_FILES=$(git diff --name-only | grep '\.cs$' || true)
+    if [[ -n "$CHANGED_FILES" ]]; then
+      echo "[pre-commit] 📋 Formatted files:"
+      echo "$CHANGED_FILES" | while read -r file; do
+        echo "   • $file"
+      done
+    fi
+    
+    git add -A
+  else
+    echo "[pre-commit] ✅ No formatting changes needed."
+  fi
+else
+  echo "[pre-commit] ⚠️  dotnet format not available. Skipping format step."
+  echo "Install with: dotnet tool install -g dotnet-format"
+fi
+
+echo "[pre-commit] Building solution with analyzers..."
+# Build without restoring (faster), fail on errors; warnings are shown but not fatal here
+if dotnet build --no-restore >/dev/null; then
+  echo "[pre-commit] ✅ Build passed"
+else
+  echo "[pre-commit] ❌ Build failed; aborting commit"
+  exit 1
+fi
+
+echo "[pre-commit] Optionally run tests: set RUN_TESTS=1 to enable"
+if [[ "${RUN_TESTS:-0}" == "1" ]]; then
+  echo "[pre-commit] Running tests..."
+  dotnet test --no-build --nologo
+fi
+
+exit 0

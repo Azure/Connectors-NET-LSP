@@ -1,0 +1,232 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "watch",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["watch", "--project", "Server", "--no-hot-reload"],
+      "isBackground": true,
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": {
+        "owner": "csharp",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.*)\\((\\d+),(\\d+)\\):\\s+(warning|error)\\s+(\\w+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Building.*$",
+          "endsPattern": "^.*Waiting for a file to change.*$"
+        }
+      }
+    },
+    {
+      "label": "run-server",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["run", "--project", "Server"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-current-platform",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "Server/SdkLspServer.csproj",
+        "-c",
+        "Release",
+        "-o",
+        "./LSPServer",
+        "--self-contained"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-and-zip",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "dotnet publish Server/SdkLspServer.csproj -c Release -o LSPServer --self-contained && cd LSPServer && zip -r ../LSPServer.zip . && cd .. && echo '✓ Published and zipped to LSPServer.zip'"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-windows",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "Server/SdkLspServer.csproj",
+        "-c",
+        "Release",
+        "-r",
+        "win-x64",
+        "--self-contained",
+        "-o",
+        "./LSPServer-win"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-macos",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "Server/SdkLspServer.csproj",
+        "-c",
+        "Release",
+        "-r",
+        "osx-x64",
+        "--self-contained",
+        "-o",
+        "./LSPServer-mac"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-linux",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "Server/SdkLspServer.csproj",
+        "-c",
+        "Release",
+        "-r",
+        "linux-x64",
+        "--self-contained",
+        "-o",
+        "./LSPServer-linux"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "publish-all-platforms",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "publish-windows",
+        "publish-macos",
+        "publish-linux"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "clean",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["clean"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean-dist",
+      "type": "shell",
+      "command": "rm",
+      "args": ["-rf", "LSPServer*", "dist*", "*.zip"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "check-lsp-running",
+      "type": "shell",
+      "command": "${workspaceFolder}/get-lsp-pid.sh",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}
