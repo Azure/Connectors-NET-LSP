@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable built-in .NET analyzers and enforce code style at build time -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Treat all warnings as errors so no restore or build warning sneaks through -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- StyleCop: style and documentation rules (PrivateAssets avoids leaking to consumers) -->
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507" PrivateAssets="all" />
+    <!-- Roslynator: additional code-quality analyzers and refactorings -->
+    <PackageReference Include="Roslynator.Analyzers" Version="4.10.0" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

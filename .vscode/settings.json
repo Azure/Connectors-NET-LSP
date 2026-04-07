@@ -1,0 +1,11 @@
+{
+  // C# Debugger settings
+  "csharp.debug.processPickerDisplayMode": "detailed",
+  
+  // Show helpful hints
+  "workbench.tips.enabled": true,
+  
+  // Auto-save to work well with watch mode
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000
+}

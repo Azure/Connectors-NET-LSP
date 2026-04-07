@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <!-- Build an executable targeting .NET 8 -->
+    <OutputType>Exe</OutputType>
+    <!-- Enable implicit global using directives and nullable reference types -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Default to framework-dependent output so dotnet can host the DLL -->
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Server.Tests" />
+  </ItemGroup>
+
+  <!-- Enable single-file publishing only when producing self-contained builds -->
+  <PropertyGroup Condition="'$(SelfContained)' == 'true'">
+    <PublishSingleFile>true</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Handlers/HoverHandler/DynamicOperationsMetadata.json" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Azure.Identity" Version="1.13.2" />
+    <PackageReference Include="ICSharpCode.Decompiler" Version="9.1.0.7988" />
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
+    <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis" Version="4.13.0" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.4" />
+    <PackageReference Include="NuGet.Configuration" Version="6.14.0" />
+    <PackageReference Include="NuGet.Packaging" Version="6.14.0" />
+    <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
+      <!-- SharpZipLib provides ZIP handling for NuGet packages -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.4.0" />
+  </ItemGroup>
+
+  <!-- Custom build targets for easy publishing -->
+  <Target Name="PublishCurrentPlatform">
+    <Exec Command="dotnet publish $(MSBuildProjectFile) -c Release -o ../LSPServer --self-contained" />
+  </Target>
+
+  <Target Name="PublishWindows">
+    <Exec Command="dotnet publish $(MSBuildProjectFile) -c Release -r win-x64 --self-contained -o ../LSPServer-win" />
+  </Target>
+
+  <Target Name="PublishMacOS">
+    <Exec Command="dotnet publish $(MSBuildProjectFile) -c Release -r osx-x64 --self-contained -o ../LSPServer-mac" />
+  </Target>
+
+  <Target Name="PublishLinux">
+    <Exec Command="dotnet publish $(MSBuildProjectFile) -c Release -r linux-x64 --self-contained -o ../LSPServer-linux" />
+  </Target>
+
+  <Target Name="PublishFrameworkDependent">
+    <Exec Command="dotnet publish $(MSBuildProjectFile) -c Release -o ../LSPServer" />
+  </Target>
+
+  <Target Name="PublishAll" DependsOnTargets="PublishWindows;PublishMacOS;PublishLinux" />
+
+  <Target Name="CleanDist">
+    <RemoveDir Directories="../LSPServer;../LSPServer-win;../LSPServer-mac;../LSPServer-linux;../dist;../dist-win;../dist-mac;../dist-linux" />
+  </Target>
+
+</Project>

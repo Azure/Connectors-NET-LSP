@@ -1,0 +1,94 @@
+{
+  "name": "connector-sdk-intellisense",
+  "displayName": "Azure Connectors SDK IntelliSense",
+  "description": "Provides IntelliSense, completions, and dynamic value suggestions for the Azure Connectors SDK.",
+  "version": "0.1.0",
+  "publisher": "microsoft",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Azure/Connectors-NET-LSP.git"
+  },
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:csharp",
+    "workspaceContains:**/*.csproj"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "connectorSdk.openConnectionView",
+        "title": "Manage Connector Connections",
+        "category": "Connector SDK"
+      },
+      {
+        "command": "connectorSdk.restartLanguageServer",
+        "title": "Restart Language Server",
+        "category": "Connector SDK"
+      }
+    ],
+    "configuration": {
+      "title": "Connector SDK IntelliSense",
+      "properties": {
+        "connectorSdk.sdkNupkgPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Connector SDK .nupkg file. If empty, the extension will search the workspace."
+        },
+        "connectorSdk.lspServerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the LSP server DLL (SdkLspServer.dll). If empty, uses the bundled server."
+        },
+        "connectorSdk.azure.baseUrl": {
+          "type": "string",
+          "default": "https://management.azure.com",
+          "description": "Azure Management API base URL."
+        },
+        "connectorSdk.azure.subscriptionId": {
+          "type": "string",
+          "default": "",
+          "description": "Azure subscription ID for dynamic value resolution."
+        },
+        "connectorSdk.azure.resourceGroup": {
+          "type": "string",
+          "default": "",
+          "description": "Azure resource group for dynamic value resolution."
+        },
+        "connectorSdk.azure.bearerToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional: explicit Azure bearer token for dynamic value resolution. If empty, the server acquires tokens automatically via DefaultAzureCredential (az login)."
+        },
+        "connectorSdk.connectionsFilePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to connections.json or local.settings.json. If empty, auto-detected from workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.100.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.0"
+  }
+}
