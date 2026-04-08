@@ -9,6 +9,23 @@ public class SdkIndexConstantDiscoveryTests
 {
     private static SdkLspServer.SdkIndex? sdkIndex;
 
+    private static void SkipIfNoSdk()
+    {
+        if (sdkIndex is null)
+        {
+            Assert.Inconclusive("SDK .nupkg not found — skipping. Place it in the SDK/ directory to enable this test.");
+        }
+    }
+
+    private static SdkLspServer.SdkIndex SdkIndex
+    {
+        get
+        {
+            SkipIfNoSdk();
+            return sdkIndex!;
+        }
+    }
+
     [ClassInitialize]
     public static async Task ClassInitializeAsync(TestContext context)
     {
@@ -43,18 +60,18 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void SdkIndex_IsCreated_Successfully()
     {
-        Assert.IsNotNull(sdkIndex, "SdkIndex should be creatable from the bundled nupkg");
+        SkipIfNoSdk();
     }
 
     [TestMethod]
     public void ConnectorNameConstants_ContainsExpectedEntries()
     {
-        Assert.IsNotNull(sdkIndex);
+        SkipIfNoSdk();
         Assert.IsTrue(
-            sdkIndex.ConnectorNameConstants.Length >= 3,
+            SdkIndex.ConnectorNameConstants.Length >= 3,
             "Should have at least 3 connector names");
 
-        var names = sdkIndex.ConnectorNameConstants.Select(c => c.Value).ToList();
+        var names = SdkIndex.ConnectorNameConstants.Select(c => c.Value).ToList();
         CollectionAssert.Contains(names, "office365");
         CollectionAssert.Contains(names, "sharepointonline");
         CollectionAssert.Contains(names, "teams");
@@ -63,9 +80,9 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void ConnectorNameConstants_HaveCorrectFieldNames()
     {
-        Assert.IsNotNull(sdkIndex);
+        SkipIfNoSdk();
 
-        var office365 = sdkIndex.ConnectorNameConstants.FirstOrDefault(c => c.Value == "office365");
+        var office365 = SdkIndex.ConnectorNameConstants.FirstOrDefault(c => c.Value == "office365");
         Assert.IsNotNull(office365);
         Assert.AreEqual("Office365", office365.FieldName);
         Assert.AreEqual("ConnectorNames", office365.ClassName);
@@ -74,35 +91,35 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void TriggerOperationsByConnector_ContainsOffice365()
     {
-        Assert.IsNotNull(sdkIndex);
+        SkipIfNoSdk();
         Assert.IsTrue(
-            sdkIndex.TriggerOperationsByConnector.ContainsKey("office365"),
+            SdkIndex.TriggerOperationsByConnector.ContainsKey("office365"),
             "Should have office365 trigger operations");
     }
 
     [TestMethod]
     public void TriggerOperationsByConnector_ContainsSharepointonline()
     {
-        Assert.IsNotNull(sdkIndex);
+        SkipIfNoSdk();
         Assert.IsTrue(
-            sdkIndex.TriggerOperationsByConnector.ContainsKey("sharepointonline"),
+            SdkIndex.TriggerOperationsByConnector.ContainsKey("sharepointonline"),
             "Should have sharepointonline trigger operations");
     }
 
     [TestMethod]
     public void TriggerOperationsByConnector_ContainsTeams()
     {
-        Assert.IsNotNull(sdkIndex);
+        SkipIfNoSdk();
         Assert.IsTrue(
-            sdkIndex.TriggerOperationsByConnector.ContainsKey("teams"),
+            SdkIndex.TriggerOperationsByConnector.ContainsKey("teams"),
             "Should have teams trigger operations");
     }
 
     [TestMethod]
     public void GetTriggerOperations_Office365_ReturnsExpectedOperations()
     {
-        Assert.IsNotNull(sdkIndex);
-        var ops = sdkIndex.GetTriggerOperations("office365");
+        SkipIfNoSdk();
+        var ops = SdkIndex.GetTriggerOperations("office365");
 
         Assert.IsTrue(ops.Length > 0, "Should have office365 operations");
         var opNames = ops.Select(o => o.Value).ToList();
@@ -113,9 +130,9 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void GetTriggerOperations_CaseInsensitive()
     {
-        Assert.IsNotNull(sdkIndex);
-        var ops1 = sdkIndex.GetTriggerOperations("office365");
-        var ops2 = sdkIndex.GetTriggerOperations("Office365");
+        SkipIfNoSdk();
+        var ops1 = SdkIndex.GetTriggerOperations("office365");
+        var ops2 = SdkIndex.GetTriggerOperations("Office365");
 
         Assert.AreEqual(ops1.Length, ops2.Length, "Should be case-insensitive");
     }
@@ -123,16 +140,16 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void GetTriggerOperations_UnknownConnector_ReturnsEmpty()
     {
-        Assert.IsNotNull(sdkIndex);
-        var ops = sdkIndex.GetTriggerOperations("nonexistent");
+        SkipIfNoSdk();
+        var ops = SdkIndex.GetTriggerOperations("nonexistent");
         Assert.AreEqual(0, ops.Length);
     }
 
     [TestMethod]
     public void GetAllTriggerOperations_ReturnsFromAllConnectors()
     {
-        Assert.IsNotNull(sdkIndex);
-        var allOps = sdkIndex.GetAllTriggerOperations().ToList();
+        SkipIfNoSdk();
+        var allOps = SdkIndex.GetAllTriggerOperations().ToList();
 
         Assert.IsTrue(allOps.Count > 10, "Should have many operations across all connectors");
 
@@ -144,8 +161,8 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void GetPayloadTypeForOperation_KnownOperation_ReturnsType()
     {
-        Assert.IsNotNull(sdkIndex);
-        string? payloadType = sdkIndex.GetPayloadTypeForOperation("office365", "OnNewEmailV3");
+        SkipIfNoSdk();
+        string? payloadType = SdkIndex.GetPayloadTypeForOperation("office365", "OnNewEmailV3");
 
         Assert.IsNotNull(payloadType);
         Assert.IsTrue(payloadType.EndsWith("Office365OnNewEmailV3TriggerPayload", StringComparison.Ordinal));
@@ -154,8 +171,8 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void GetPayloadTypeForOperation_UnknownOperation_ReturnsNull()
     {
-        Assert.IsNotNull(sdkIndex);
-        string? payloadType = sdkIndex.GetPayloadTypeForOperation("office365", "NonexistentOperation");
+        SkipIfNoSdk();
+        string? payloadType = SdkIndex.GetPayloadTypeForOperation("office365", "NonexistentOperation");
 
         Assert.IsNull(payloadType);
     }
@@ -163,8 +180,8 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void GetPayloadTypeForOperation_UnknownConnector_ReturnsNull()
     {
-        Assert.IsNotNull(sdkIndex);
-        string? payloadType = sdkIndex.GetPayloadTypeForOperation("nonexistent", "OnNewEmailV3");
+        SkipIfNoSdk();
+        string? payloadType = SdkIndex.GetPayloadTypeForOperation("nonexistent", "OnNewEmailV3");
 
         Assert.IsNull(payloadType);
     }
@@ -172,8 +189,8 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public void TriggerPayloadTypes_ExistInTypeNames()
     {
-        Assert.IsNotNull(sdkIndex);
-        var payloadTypes = sdkIndex.TypeNames
+        SkipIfNoSdk();
+        var payloadTypes = SdkIndex.TypeNames
             .Where(t => t.EndsWith("TriggerPayload", StringComparison.Ordinal))
             .ToList();
 

@@ -31,6 +31,7 @@ All three use Roslyn's AST + semantic model for context detection.
 The CompletionHandler has no path for detecting when the cursor is inside a C# **attribute argument** like `[ConnectorTrigger(ConnectorName = "|")]`. Current detection only handles method call arguments.
 
 **Implementation approach:**
+
 ```csharp
 // Walk up AST from token to find AttributeArgumentSyntax
 AttributeArgumentSyntax? attrArg = token.Parent?.AncestorsAndSelf()
@@ -61,6 +62,7 @@ Need to load the `ConnectorNames` static class from the SDK assembly, extract pu
 When `ConnectorName = ConnectorNames.Office365` is already set, the LSP should offer only Office365 trigger operations (`Office365TriggerOperations.*`).
 
 **Approach:**
+
 1. Parse the attribute to find the `ConnectorName` value (read sibling parameter)  
 2. Map connector name → `{Connector}TriggerOperations` class name
 3. Load the class, extract constants, offer as completions
@@ -104,13 +106,14 @@ When a developer types `Deserialize<` (no closing `>`), Roslyn's parser uses err
 ### New SdkIndex Capabilities
 
 The `SdkIndex` now discovers at startup (via `MetadataLoadContext` + `GetRawConstantValue()`):
+
 - `ConnectorNameConstants` — All `public const string` fields from `ConnectorNames` class
 - `TriggerOperationsByConnector` — Dictionary of connector name → `ImmutableArray<SdkConstant>` from `*TriggerOperations` classes
 - `GetPayloadTypeForOperation(connector, operation)` — Maps to `{Connector}{Operation}TriggerPayload` type name
 
 ### CompletionHandler Priority Chain (Updated)
 
-```
+```text
 PRIORITY 0: Attribute argument context
   → [ConnectorTriggerMetadata(ConnectorName = |)] → ConnectorNames.* constants
   → [ConnectorTriggerMetadata(OperationName = |)] → *TriggerOperations.* (filtered by ConnectorName)
@@ -137,6 +140,7 @@ The attribute handler (Priority 0) now runs BEFORE the string literal handler (P
 ### Test Coverage
 
 44 new tests added (78 total, up from 34):
+
 - `AttributeCompletionTests` — AST-based attribute parameter extraction, text-based fallback, deserialization method whitelist, enclosing method attribute detection
 - `SdkIndexConstantDiscoveryTests` — Validates ConnectorNames, TriggerOperations, and payload type mapping from actual SDK nupkg
 
@@ -161,6 +165,7 @@ The attribute handler (Priority 0) now runs BEFORE the string literal handler (P
 ## Risk: String-in-attribute collision
 
 The most subtle issue is that `ConnectorName = "office365"` is simultaneously:
+
 - A string literal (current handler would fire)
 - An attribute argument value (new handler should fire)
 

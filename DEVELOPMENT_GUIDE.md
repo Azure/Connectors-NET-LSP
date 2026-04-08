@@ -9,6 +9,7 @@ Complete guide for developing and debugging the Connectors LSP Server with autom
 ### Watch Mode Development (No Debugging)
 
 **Terminal 1: Start watch mode**
+
 ```bash
 cd <repo-root>   # connector-sdk-lsp
 dotnet watch --project Server --no-hot-reload
@@ -23,6 +24,7 @@ dotnet watch --project Server --no-hot-reload
 Alternatively, set `connectorSdk.lspServerPath` in your VS Code settings to point to the server DLL built from `Server/`.
 
 **Make changes:**
+
 - Edit C# files → Watch rebuilds and restarts automatically
 - In Extension Development Host: **Ctrl+Shift+P** (or **Cmd+Shift+P** on macOS) → **"Reload Window"**
 - Changes are live!
@@ -34,17 +36,20 @@ Alternatively, set `connectorSdk.lspServerPath` in your VS Code settings to poin
 **Step 1: Start extension** (see above for how to launch the Extension Development Host)
 
 **Step 2: Attach debugger** (connector-sdk-lsp window)
-```
+
+```text
 Press F5 → "🚀 Attach to Local LSP Server (One-Click)"
 ```
 
 **Step 3: Pick the process**
+
 - Pre-launch shows: `✓ Found LSP Server process: PID 12345`
 - Process picker appears
 - Click the process with `SdkLspServer.dll` in command line
 - Debugger attaches!
 
 **Step 4: Debug**
+
 - Set breakpoints anywhere
 - Use the extension → breakpoints hit!
 
@@ -88,7 +93,7 @@ The VS Code extension resolves the LSP server path in the following order:
 
 1. **Explicit setting** — `connectorSdk.lspServerPath` in VS Code settings
 2. **Sibling debug build** — `<repo-root>/Server/bin/Debug/net8.0/SdkLspServer.dll` (preferred in dev mode so `dotnet build` output is used instead of a stale published artifact)
-3. **Bundled server** — `<extension-path>/server/SdkLspServer.dll` (populated by publishing the server into `vscode-extension/server/` before packaging; see [VSIX packaging](#vs-code-extension-packaging) in the README)
+3. **Bundled server** — `<extension-path>/server/SdkLspServer.dll` (populated by publishing the server into `vscode-extension/server/` before packaging; see [VSIX packaging](README.md#vs-code-extension-packaging) in the README)
 
 For development, the sibling build output is discovered automatically when you open the repo root in VS Code and launch the extension via F5. Alternatively, set `connectorSdk.lspServerPath` in `.vscode/settings.json`:
 
@@ -105,6 +110,7 @@ For development, the sibling build output is discovered automatically when you o
 ### Debugger Attachment
 
 The "One-Click" configuration:
+
 1. Runs a pre-launch task to verify the server is running
 2. Shows a process picker with all processes
 3. You select the one with `SdkLspServer.dll`
@@ -115,6 +121,7 @@ The "One-Click" configuration:
 ## 🎯 Key Breakpoint Locations
 
 ### Handle Hover Requests
+
 ```csharp
 // HoverHandler.cs - line ~40
 public async Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
@@ -126,6 +133,7 @@ public async Task<Hover?> Handle(HoverParams request, CancellationToken cancella
 ```
 
 ### Handle Code Lens
+
 ```csharp
 // CodeLensHandler.cs - line ~35
 public async Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken cancellationToken)
@@ -136,6 +144,7 @@ public async Task<CodeLensContainer?> Handle(CodeLensParams request, Cancellatio
 ```
 
 ### SDK Index Queries
+
 ```csharp
 // SdkIndex.cs - line ~150
 public MethodInfo? FindMethod(string methodName)
@@ -146,6 +155,7 @@ public MethodInfo? FindMethod(string methodName)
 ```
 
 ### Document Access
+
 ```csharp
 // BufferManager.cs - line ~30
 public bool TryGetBuffer(Uri uri, out string content)
@@ -156,6 +166,7 @@ public bool TryGetBuffer(Uri uri, out string content)
 ```
 
 ### Server Initialization
+
 ```csharp
 // Program.cs - line ~15
 private static async Task Main(string[] args)
@@ -182,7 +193,8 @@ private static async Task Main(string[] args)
 ### Breakpoints show as hollow/unverified
 
 **Cause**: Source mismatch or wrong process  
-**Fix**: 
+**Fix**:
+
 ```bash
 dotnet clean && dotnet build
 # Then reattach debugger
@@ -191,6 +203,7 @@ dotnet clean && dotnet build
 ### "Can't find process with SdkLspServer.dll"
 
 **Check**:
+
 ```bash
 ./get-lsp-pid.sh  # Shows if server is running
 ```
@@ -200,6 +213,7 @@ If not running, start the extension first.
 ### Changes not appearing
 
 **Verify**:
+
 1. Watch task shows "Waiting for a file to change..." (rebuild complete)
 2. You reloaded the Extension Development Host window
 3. You're testing in the Extension Development Host (not main window)
@@ -207,6 +221,7 @@ If not running, start the extension first.
 ### Debugger attached but breakpoints don't hit
 
 **Check**:
+
 1. Code path is executing (add log statement to verify)
 2. Correct process selected (run `./get-lsp-pid.sh` to confirm)
 3. Using dev build (check env var is set in launch.json)
@@ -217,6 +232,7 @@ If not running, start the extension first.
 ## 🛠 Helper Scripts
 
 ### `find-lsp-process.sh`
+
 Shows running LSP server processes with detailed info.
 
 ```bash
@@ -227,6 +243,7 @@ Shows running LSP server processes with detailed info.
 ```
 
 ### `get-lsp-pid.sh`
+
 Used by the pre-launch task. Verifies server is running before showing process picker.
 
 ---
@@ -250,14 +267,17 @@ Used by the pre-launch task. Verifies server is running before showing process p
 Debug both the extension AND the server simultaneously:
 
 **Window 1 (Extension):**
+
 - Set breakpoints in TypeScript extension code (`vscode-extension/src/extension.ts`)
 - Press F5
 
 **Window 2 (Server):**
+
 - Set breakpoints in C# server code
 - Press F5 → Attach
 
 **Flow:**
+
 - Trigger feature in Extension Development Host
 - Breakpoint hits in TypeScript (Window 1)
 - Step through, see LSP request sent
@@ -285,13 +305,15 @@ someVariable != null && someVariable.Count > 0
 Non-breaking trace points that log to Debug Console:
 
 Right-click in gutter → "Add Logpoint"
-```
+
+```text
 Message: Position: {position.Line},{position.Character}
 ```
 
 ### Watch Expressions
 
 Add to Watch panel:
+
 - `uri.ToString()` - Current document URI
 - `position` - Current cursor position
 - `_buffers.Count` - Number of tracked documents
