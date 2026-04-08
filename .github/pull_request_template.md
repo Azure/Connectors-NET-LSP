@@ -18,5 +18,5 @@
 
 ## Checklist
 
-- [ ] Code follows the project's [coding conventions](copilot-instructions.md)
+- [ ] Code follows the project's [coding conventions](.github/copilot-instructions.md)
 - [ ] Documentation updated (if behavior changed)
