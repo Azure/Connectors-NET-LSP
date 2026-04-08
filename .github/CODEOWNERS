@@ -1,0 +1,9 @@
+# Default owners
+* @Azure/azure-logicapps-team
+
+# Server
+/Server/ @Azure/azure-logicapps-team
+/Server.Tests/ @Azure/azure-logicapps-team
+
+# VS Code extension
+/vscode-extension/ @Azure/azure-logicapps-team
