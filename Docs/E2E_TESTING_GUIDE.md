@@ -32,7 +32,7 @@ The guide uses the [Connectors-NET-SDK](https://github.com/Azure/Connectors-NET-
 
 Clone these repos side by side (the relative paths don't matter, but they make later steps easier):
 
-```
+```text
 your-workspace/
   connector-sdk-lsp/          # This repo (LSP server + VS Code extension)
   Connectors-NET-SDK/  # Connectors SDK source
@@ -57,7 +57,8 @@ dotnet build src/Microsoft.Azure.Connectors.Sdk/Microsoft.Azure.Connectors.Sdk.c
 ```
 
 **Output:**
-```
+
+```text
 src/Microsoft.Azure.Connectors.Sdk/bin/Release/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
 ```
 
@@ -84,7 +85,8 @@ ls Connectors-NET-Samples/SDK/*.nupkg
 ```
 
 You should see at least:
-```
+
+```text
 Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
 ```
 
@@ -110,11 +112,13 @@ This produces `Server/bin/Debug/net8.0/SdkLspServer.dll`, which the VS Code exte
 This is the fastest way to test. No VSIX packaging needed.
 
 1. Open `connector-sdk-lsp/vscode-extension/` as a **separate VS Code window**:
+
    ```bash
    code connector-sdk-lsp/vscode-extension/
    ```
 
 2. Install npm dependencies:
+
    ```bash
    cd connector-sdk-lsp/vscode-extension
    npm install
@@ -202,7 +206,8 @@ That's all. Both the Functions runtime and the LSP server pick up your Azure CLI
 > The template file includes commented-out `__Connectors:{name}:ManagedIdentityClientId` keys. Remove the `__` prefix to activate MSI for a connector.
 
 Once saved, the extension picks up the file automatically — check the **Output** panel (**View → Output** → select **"Connectors SDK LSP"**) for:
-```
+
+```text
 Pushed merged connection update (triggered by .../local.settings.json)
 ```
 
@@ -253,7 +258,7 @@ var tables = await this._sharePointClient
 
 Hover over `siteAddress:` — if the connection is live and `az login` is active, the tooltip shows:
 
-```
+```text
 Dynamic values:
 - https://contoso.sharepoint.com (click to insert)
 - https://contoso.sharepoint.com/sites/TeamSite (click to insert)
@@ -290,7 +295,7 @@ Look for CodeLens annotations above method declarations. These provide quick act
 
 The extension's output channel (**Connectors SDK LSP**) shows diagnostic information:
 
-```
+```text
 Starting LSP server from: .../Server/bin/Debug/net8.0/SdkLspServer.dll
 SDK .nupkg: .../SDK/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
 Initialization: apiConfig=none, connections=2
@@ -299,7 +304,7 @@ LSP server started successfully.
 
 If the SDK loads correctly, the server reports the assembly and type count via `window/showMessage`. Look for a notification like:
 
-```
+```text
 Loaded SDK: 1 assemblies, N types (source: arg)
 ```
 
@@ -310,6 +315,7 @@ Loaded SDK: 1 assemblies, N types (source: arg)
 ### "Could not find SdkLspServer.dll"
 
 The extension couldn't auto-discover the server. Ensure:
+
 1. You built the server (`dotnet build Server/SdkLspServer.csproj`)
 2. The extension is opened from the `vscode-extension/` folder inside the LSP repo (so the sibling path `../Server/bin/Debug/net8.0/` resolves correctly)
 3. Or set `connectorSdk.lspServerPath` explicitly in VS Code settings
