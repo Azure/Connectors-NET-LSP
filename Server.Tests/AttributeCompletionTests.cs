@@ -23,7 +23,7 @@ public class AttributeCompletionTests
             using System;
             class Test
             {
-                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmailV3")]
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public void MyMethod() { }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
@@ -39,7 +39,7 @@ public class AttributeCompletionTests
         string? operationName = GetTriggerMetadataParameterValue(method, "OperationName");
 
         Assert.AreEqual("office365", connectorName);
-        Assert.AreEqual("OnNewEmailV3", operationName);
+        Assert.AreEqual("OnNewEmail", operationName);
     }
 
     /// <summary>
@@ -264,7 +264,7 @@ public class AttributeCompletionTests
             {
                 [ConnectorTriggerMetadata(
                     ConnectorName = ConnectorNames.Office365,
-                    OperationName = Office365TriggerOperations.OnNewEmailV3)]
+                    OperationName = Office365TriggerOperations.OnNewEmail)]
                 public void TriggerCallback()
                 {
                     var body = "test";
@@ -277,7 +277,7 @@ public class AttributeCompletionTests
                 public string OperationName { get; set; } = "";
             }
             public static class ConnectorNames { public const string Office365 = "office365"; }
-            public static class Office365TriggerOperations { public const string OnNewEmailV3 = "OnNewEmailV3"; }
+            public static class Office365TriggerOperations { public const string OnNewEmail = "OnNewEmail"; }
             """;
 
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
@@ -289,8 +289,8 @@ public class AttributeCompletionTests
 
         string? result = GetEnclosingMethodTriggerOperationName(root, position);
 
-        // Should return "OnNewEmailV3" (the member name from the constant reference)
-        Assert.AreEqual("OnNewEmailV3", result);
+        // Should return "OnNewEmail" (the member name from the constant reference)
+        Assert.AreEqual("OnNewEmail", result);
     }
 
     /// <summary>
