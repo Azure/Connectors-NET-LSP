@@ -123,7 +123,7 @@ public class SdkIndexConstantDiscoveryTests
 
         Assert.IsTrue(ops.Length > 0, "Should have office365 operations");
         var opNames = ops.Select(o => o.Value).ToList();
-        CollectionAssert.Contains(opNames, "OnNewEmailV3");
+        CollectionAssert.Contains(opNames, "OnNewEmail");
         CollectionAssert.Contains(opNames, "OnUpcomingEventsV3");
     }
 
@@ -162,10 +162,10 @@ public class SdkIndexConstantDiscoveryTests
     public void GetPayloadTypeForOperation_KnownOperation_ReturnsType()
     {
         SkipIfNoSdk();
-        string? payloadType = SdkIndex.GetPayloadTypeForOperation("office365", "OnNewEmailV3");
+        string? payloadType = SdkIndex.GetPayloadTypeForOperation("office365", "OnNewEmail");
 
         Assert.IsNotNull(payloadType);
-        Assert.IsTrue(payloadType.EndsWith("Office365OnNewEmailV3TriggerPayload", StringComparison.Ordinal));
+        Assert.IsTrue(payloadType.EndsWith("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -181,7 +181,7 @@ public class SdkIndexConstantDiscoveryTests
     public void GetPayloadTypeForOperation_UnknownConnector_ReturnsNull()
     {
         SkipIfNoSdk();
-        string? payloadType = SdkIndex.GetPayloadTypeForOperation("nonexistent", "OnNewEmailV3");
+        string? payloadType = SdkIndex.GetPayloadTypeForOperation("nonexistent", "OnNewEmail");
 
         Assert.IsNull(payloadType);
     }
