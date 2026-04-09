@@ -12,6 +12,6 @@
     <!-- StyleCop: style and documentation rules (PrivateAssets avoids leaking to consumers) -->
     <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.507" PrivateAssets="all" />
     <!-- Roslynator: additional code-quality analyzers and refactorings -->
-    <PackageReference Include="Roslynator.Analyzers" Version="4.10.0" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" Version="4.15.0" PrivateAssets="all" />
   </ItemGroup>
 </Project>

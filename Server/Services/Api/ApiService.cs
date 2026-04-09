@@ -51,7 +51,6 @@ public class ApiService
             ExcludeEnvironmentCredential = true,
             ExcludeWorkloadIdentityCredential = true,
             ExcludeManagedIdentityCredential = true,
-            ExcludeSharedTokenCacheCredential = true,
             ExcludeInteractiveBrowserCredential = true,
             ExcludeVisualStudioCredential = true,
             ExcludeVisualStudioCodeCredential = true,
