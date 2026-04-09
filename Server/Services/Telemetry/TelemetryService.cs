@@ -93,7 +93,7 @@ public class TelemetryService : ITelemetryService, IDisposable
             else
             {
                 // Send to Application Insights in production mode
-                client?.TrackEvent(eventName, properties, metrics);
+                client?.TrackEvent(eventName, properties);
             }
         }
         catch (Exception ex)
