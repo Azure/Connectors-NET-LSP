@@ -102,7 +102,8 @@ max_line_length = 120
 # SA1010: Opening square brackets should be spaced correctly
 dotnet_diagnostic.SA1010.severity = none
 
-# String comparison: require explicit StringComparison on string methods
+# String comparison: flag missing StringComparison on string methods (suggestion-only;
+# promote to warning after fixing pre-existing violations — see issue #34)
 # CA1307: Specify StringComparison for clarity
 dotnet_diagnostic.CA1307.severity = suggestion
 # CA1310: Specify StringComparison for correctness
