@@ -53,11 +53,11 @@ STYLE_ERRORS=0
 
 if [[ -n "$STAGED_CS" ]]; then
   # Single-letter lambda parameters (allow only 'ex' for exceptions)
-  # Uses awk instead of grep -P for macOS/BSD compatibility
+  # Uses awk on the staged snapshot (git show :file) for accuracy
   LAMBDA_HITS=""
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    FILE_HITS=$(awk '/(^|[^[:alnum:]_])[a-z][[:space:]]*=>/ && !/(^|[^[:alnum:]_])ex[[:space:]]*=>/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
+    FILE_HITS=$(git show :"$file" 2>/dev/null | awk -v fname="$file" '/(^|[^[:alnum:]_])[a-z][[:space:]]*=>/ && !/(^|[^[:alnum:]_])ex[[:space:]]*=>/ { print fname ":" NR ":" $0 }' 2>/dev/null || true)
     [[ -n "$FILE_HITS" ]] && LAMBDA_HITS+="$FILE_HITS"$'\n'
   done <<< "$STAGED_CS"
   LAMBDA_HITS=$(echo "$LAMBDA_HITS" | sed '/^$/d')
@@ -71,7 +71,7 @@ if [[ -n "$STAGED_CS" ]]; then
   CA_HITS=""
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    FILE_HITS=$(awk '/ConfigureAwait\(false\)/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
+    FILE_HITS=$(git show :"$file" 2>/dev/null | awk -v fname="$file" '/ConfigureAwait\(false\)/ { print fname ":" NR ":" $0 }' 2>/dev/null || true)
     [[ -n "$FILE_HITS" ]] && CA_HITS+="$FILE_HITS"$'\n'
   done <<< "$STAGED_CS"
   CA_HITS=$(echo "$CA_HITS" | sed '/^$/d')
