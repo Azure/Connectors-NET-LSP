@@ -134,10 +134,15 @@ async function startLanguageServer(
     // Build command-line arguments
     const args: string[] = [];
 
-    const sdkPath = await resolveSdkNupkgPath(config);
-    if (sdkPath) {
-        args.push("--sdk", sdkPath);
-        outputChannel.appendLine(`SDK .nupkg: ${sdkPath}`);
+    const sdkResult = await resolveSdkPath(config, context, outputChannel);
+    if (sdkResult) {
+        if (sdkResult.type === "assembly") {
+            args.push("--sdk-assembly", sdkResult.path);
+            outputChannel.appendLine(`SDK assembly: ${sdkResult.path} (source: ${sdkResult.source})`);
+        } else {
+            args.push("--sdk", sdkResult.path);
+            outputChannel.appendLine(`SDK .nupkg: ${sdkResult.path} (source: ${sdkResult.source})`);
+        }
     }
 
     const serverOptions: ServerOptions = {
@@ -261,52 +266,188 @@ async function resolveServerPath(
     return undefined;
 }
 
-async function resolveSdkNupkgPath(config: vscode.WorkspaceConfiguration): Promise<string | undefined> {
-    const configured = config.get<string>("sdkNupkgPath");
+interface SdkResolution {
+    path: string;
+    type: "nupkg" | "assembly";
+    source: string;
+}
+
+async function resolveSdkPath(
+    config: vscode.WorkspaceConfiguration,
+    context?: vscode.ExtensionContext,
+    outputChannel?: vscode.OutputChannel
+): Promise<SdkResolution | undefined> {
+    // 1. Explicit setting — accepts either nupkg or DLL
+    const configured = config.get<string>("sdkNupkgPath") || config.get<string>("sdkPath");
     if (configured && await fileExists(configured)) {
-        return configured;
+        const type = configured.endsWith(".dll") ? "assembly" as const : "nupkg" as const;
+        return { path: configured, type, source: "setting" };
     }
 
-    // Search workspace for .nupkg files
+    // 2. Workspace project NuGet references — parse project.assets.json
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        return undefined;
+    if (workspaceFolders) {
+        for (const folder of workspaceFolders) {
+            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel);
+            if (dllPath) {
+                return { path: dllPath, type: "assembly", source: "project-assets" };
+            }
+        }
     }
 
-    for (const folder of workspaceFolders) {
-        const sdkDir = path.join(folder.uri.fsPath, "SDK");
-        try {
-            const stat = await fs.promises.stat(sdkDir);
-            if (!stat.isDirectory()) {
-                continue;
+    // 3. Workspace SDK/ folder — search for .nupkg files
+    if (workspaceFolders) {
+        for (const folder of workspaceFolders) {
+            const found = await findNewestNupkgInDir(path.join(folder.uri.fsPath, "SDK"));
+            if (found) {
+                return { path: found, type: "nupkg", source: "workspace-sdk-folder" };
             }
+        }
+    }
 
-            const entries = await fs.promises.readdir(sdkDir);
-            const nupkgFiles = entries.filter((f) => f.endsWith(".nupkg"));
-            if (nupkgFiles.length > 0) {
-                const nupkgWithStats = await Promise.all(
-                    nupkgFiles.map(async (file) => {
-                        const fullPath = path.join(sdkDir, file);
-                        const fileStat = await fs.promises.stat(fullPath);
-                        return { file, fullPath, mtimeMs: fileStat.mtimeMs };
-                    }),
-                );
-
-                nupkgWithStats.sort((a, b) => {
-                    if (b.mtimeMs !== a.mtimeMs) {
-                        return b.mtimeMs - a.mtimeMs;
-                    }
-                    return a.file.localeCompare(b.file);
-                });
-
-                return nupkgWithStats[0].fullPath;
-            }
-        } catch {
-            continue;
+    // 4. Sibling SDK repo build output (development scenario — F5 from vscode-extension/)
+    if (context) {
+        const sdkRepoBuildDir = path.join(
+            context.extensionPath, "..", "..",
+            "Connectors-NET-SDK", "src", "Microsoft.Azure.Connectors.Sdk", "bin", "Debug"
+        );
+        const found = await findNewestNupkgInDir(sdkRepoBuildDir);
+        if (found) {
+            return { path: found, type: "nupkg", source: "sibling-repo" };
         }
     }
 
     return undefined;
+}
+
+const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
+
+async function findSdkFromProjectAssets(
+    folderPath: string,
+    outputChannel?: vscode.OutputChannel
+): Promise<string | undefined> {
+    // Find .csproj files in the folder (non-recursive, immediate children)
+    try {
+        const entries = await fs.promises.readdir(folderPath);
+        const csprojFiles = entries.filter((f) => f.endsWith(".csproj"));
+
+        for (const csproj of csprojFiles) {
+            const projectDir = folderPath;
+            const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+
+            if (!(await fileExists(assetsPath))) {
+                continue;
+            }
+
+            try {
+                const assetsContent = await fs.promises.readFile(assetsPath, "utf-8");
+                const assets = JSON.parse(assetsContent) as {
+                    libraries?: Record<string, { path?: string; type?: string }>;
+                    packageFolders?: Record<string, unknown>;
+                    targets?: Record<string, Record<string, { compile?: Record<string, unknown> }>>;
+                };
+
+                // Find the SDK library entry
+                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
+                    key.startsWith(SDK_PACKAGE_NAME + "/")
+                );
+
+                if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
+                    continue;
+                }
+
+                const libraryPath = assets.libraries[sdkLibKey].path!;
+                const packageFolders = Object.keys(assets.packageFolders ?? {});
+
+                // Find compile assets from the first target framework
+                const targets = assets.targets ?? {};
+                const firstTargetKey = Object.keys(targets)[0];
+                if (!firstTargetKey) {
+                    continue;
+                }
+
+                const targetPackage = targets[firstTargetKey][sdkLibKey];
+                const compileAssets = targetPackage?.compile ?? {};
+                const dllAssets = Object.keys(compileAssets).filter((a) => a.endsWith(".dll"));
+
+                // Resolve the DLL path from package folders
+                for (const dllRelPath of dllAssets) {
+                    for (const pkgFolder of packageFolders) {
+                        const fullPath = path.join(pkgFolder, libraryPath, dllRelPath);
+                        if (await fileExists(fullPath)) {
+                            outputChannel?.appendLine(
+                                `SDK discovered from ${csproj} → ${sdkLibKey} → ${fullPath}`
+                            );
+                            return fullPath;
+                        }
+                    }
+                }
+            } catch (err) {
+                outputChannel?.appendLine(
+                    `Failed to parse ${assetsPath}: ${err instanceof Error ? err.message : String(err)}`
+                );
+            }
+        }
+
+        // Also check subdirectories one level deep (e.g., Connectors-NET-Samples/DirectConnector/)
+        for (const entry of entries) {
+            const subDir = path.join(folderPath, entry);
+            try {
+                const subStat = await fs.promises.stat(subDir);
+                if (!subStat.isDirectory()) {
+                    continue;
+                }
+
+                const subEntries = await fs.promises.readdir(subDir);
+                if (subEntries.some((f) => f.endsWith(".csproj"))) {
+                    const result = await findSdkFromProjectAssets(subDir, outputChannel);
+                    if (result) {
+                        return result;
+                    }
+                }
+            } catch {
+                continue;
+            }
+        }
+    } catch {
+        // Folder not readable
+    }
+
+    return undefined;
+}
+
+async function findNewestNupkgInDir(dirPath: string): Promise<string | undefined> {
+    try {
+        const stat = await fs.promises.stat(dirPath);
+        if (!stat.isDirectory()) {
+            return undefined;
+        }
+
+        const entries = await fs.promises.readdir(dirPath);
+        const nupkgFiles = entries.filter((f) => f.endsWith(".nupkg"));
+        if (nupkgFiles.length === 0) {
+            return undefined;
+        }
+
+        const nupkgWithStats = await Promise.all(
+            nupkgFiles.map(async (file) => {
+                const fullPath = path.join(dirPath, file);
+                const fileStat = await fs.promises.stat(fullPath);
+                return { file, fullPath, mtimeMs: fileStat.mtimeMs };
+            }),
+        );
+
+        nupkgWithStats.sort((a, b) => {
+            if (b.mtimeMs !== a.mtimeMs) {
+                return b.mtimeMs - a.mtimeMs;
+            }
+            return a.file.localeCompare(b.file);
+        });
+
+        return nupkgWithStats[0].fullPath;
+    } catch {
+        return undefined;
+    }
 }
 
 interface ConnectionsConfig {

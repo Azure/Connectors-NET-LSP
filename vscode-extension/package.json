@@ -41,7 +41,13 @@
         "connectorSdk.sdkNupkgPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Connector SDK .nupkg file. If empty, the extension will search the workspace."
+          "markdownDescription": "**Deprecated:** Use `connectorSdk.sdkPath` instead. Path to the Connector SDK .nupkg file.",
+          "markdownDeprecationMessage": "Use `#connectorSdk.sdkPath#` instead."
+        },
+        "connectorSdk.sdkPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Connector SDK .nupkg or .dll file. If empty, the extension discovers the SDK from workspace project NuGet references."
         },
         "connectorSdk.lspServerPath": {
           "type": "string",
