@@ -10,8 +10,8 @@ namespace SdkLspServer;
 
 /// <summary>
 /// Represents an indexed SDK loaded from a NuGet package or assembly DLLs. It
-/// holds lists of assemblies and type names discovered in the package. The index
-/// is loaded eagerly on startup to avoid reflection during request handling.
+/// holds lists of assemblies and type names discovered from the SDK assemblies.
+/// The index is loaded eagerly on startup to avoid reflection during request handling.
 /// </summary>
 public sealed class SdkIndex
 {

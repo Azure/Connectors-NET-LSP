@@ -363,11 +363,15 @@ async function findSdkFromProjectAssets(
 
                 // Find compile assets from the first target framework that contains SDK DLLs
                 const targets = assets.targets ?? {};
+                const sdkLibKeyLower = sdkLibKey.toLowerCase();
                 let dllAssets: string[] = [];
 
                 for (const targetKey of Object.keys(targets)) {
-                    const targetPackage = targets[targetKey]?.[sdkLibKey];
-                    const compileAssets = targetPackage?.compile ?? {};
+                    const targetPackages = targets[targetKey] ?? {};
+                    const targetSdkKey = Object.keys(targetPackages).find((key) =>
+                        key.toLowerCase() === sdkLibKeyLower
+                    );
+                    const compileAssets = targetSdkKey ? (targetPackages[targetSdkKey]?.compile ?? {}) : {};
                     const targetDlls = Object.keys(compileAssets).filter((asset) => asset.endsWith(".dll"));
 
                     if (targetDlls.length > 0) {
