@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -224,7 +226,8 @@ public class ApiService
     /// <returns>The response content as a string, or null if the request fails.</returns>
     public async Task<string?> PostJsonAsync(string url, object payload, CancellationToken cancellationToken = default)
     {
-        string payloadHash = JsonSerializer.Serialize(payload, jsonOptions).GetHashCode().ToString();
+        string payloadJson = JsonSerializer.Serialize(payload, jsonOptions);
+        string payloadHash = ComputeHash(payloadJson);
         string cacheKey = $"POST:{url}:{payloadHash}";
 
         return await cache.GetOrSetAsync<string?>(
@@ -271,7 +274,8 @@ public class ApiService
     /// <returns>The deserialized response object, or default if the request fails.</returns>
     public async Task<TResponse?> PostJsonAsync<TResponse>(string url, object payload, CancellationToken cancellationToken = default)
     {
-        string payloadHash = JsonSerializer.Serialize(payload, jsonOptions).GetHashCode().ToString();
+        string payloadJson = JsonSerializer.Serialize(payload, jsonOptions);
+        string payloadHash = ComputeHash(payloadJson);
         string cacheKey = $"POST_JSON:{typeof(TResponse).FullName}:{url}:{payloadHash}";
 
         return await cache.GetOrSetAsync<TResponse?>(
@@ -309,5 +313,15 @@ public class ApiService
                 .SetFailSafe(true, TimeSpan.FromHours(1))
                 .SetFactoryTimeouts(TimeSpan.FromSeconds(30), keepTimedOutFactoryResult: false),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Computes a deterministic SHA-256 hash of the input string for use as a cache key component.
+    /// </summary>
+    /// <param name="input">The string to hash.</param>
+    private static string ComputeHash(string input)
+    {
+        byte[] hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(hashBytes);
     }
 }
