@@ -297,6 +297,33 @@ Within each group: public → internal → private
 | Magic strings (e.g., `"type"`, `"object"`) | Named constants (e.g., `SchemaPropertyNames.Type`) |
 | `[0]` or `.First()` | `.Single()` (or `.SingleOrDefault()` + explicit validation) |
 
+## Pre-Commit Review Checklist
+
+Before committing, verify:
+
+1. **Coding standards** — Grep changed files for:
+   - Single-letter lambda parameters (`p =>`, `v =>`, `c =>`) → rename to descriptive names
+   - `StringComparison` missing on `.StartsWith()`, `.EndsWith()`, `.Contains()`, `.IndexOf()`, `.Replace()`
+   - Unnamed boolean arguments → add named parameter
+   - `ConfigureAwait(false)` → `ConfigureAwait(continueOnCapturedContext: false)`
+
+2. **Comment staleness** — For every behavior change, search for comments/docs describing the old behavior. Update all of them, not just the code. Common locations:
+   - XML `<summary>` docs on the changed method
+   - Inline comments near the changed code
+   - Startup/initialization comments referencing the feature
+   - README sections describing the feature
+
+3. **Edge cases** — For every new parameter, function, or code path, ask:
+   - What if the input is null/empty?
+   - What if the input is the wrong type (e.g., DLL path where nupkg expected)?
+   - What if a dependency is missing (e.g., no `project.assets.json`)?
+   - What if a collection has 0 items? 1 item? Many items?
+
+4. **Design completeness** — Before pushing a fix, review the full call chain:
+   - Does the caller handle all return values correctly?
+   - Are property/parameter names accurate for all callers (not just the original use case)?
+   - Will the next reviewer find a cascading issue from this change?
+
 ## Testing
 
 ```csharp
