@@ -145,9 +145,14 @@ public sealed class SdkIndex
             string sourceDescription = validPaths.Count == 1
                 ? validPaths[0]
                 : $"{validPaths.Count} assemblies";
-            string containingDir = Path.GetDirectoryName(validPaths[0]) ?? string.Empty;
 
-            return await BuildIndexAsync(sourceDescription, containingDir, validPaths);
+            // Use the common parent directory when assemblies span multiple directories,
+            // or the containing directory when there is only one.
+            string rootDirectory = validPaths.Count == 1
+                ? Path.GetDirectoryName(validPaths[0]) ?? string.Empty
+                : FindCommonParentDirectory(validPaths);
+
+            return await BuildIndexAsync(sourceDescription, rootDirectory, validPaths);
         }
         catch (Exception ex)
         {
@@ -157,9 +162,44 @@ public sealed class SdkIndex
     }
 
     /// <summary>
+    /// Finds the deepest common parent directory for a list of file paths.
+    /// </summary>
+    private static string FindCommonParentDirectory(List<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        string[] segments = Path.GetDirectoryName(paths[0])?.Split(Path.DirectorySeparatorChar) ?? [];
+        foreach (string filePath in paths.Skip(1))
+        {
+            string[] otherSegments = Path.GetDirectoryName(filePath)?.Split(Path.DirectorySeparatorChar) ?? [];
+            int commonLength = Math.Min(segments.Length, otherSegments.Length);
+            int matchCount = 0;
+            for (int i = 0; i < commonLength; i++)
+            {
+                if (!string.Equals(segments[i], otherSegments[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                matchCount++;
+            }
+
+            segments = segments[..matchCount];
+        }
+
+        return segments.Length > 0 ? string.Join(Path.DirectorySeparatorChar, segments) : string.Empty;
+    }
+
+    /// <summary>
     /// Shared indexing logic used by both nupkg and direct-assembly creation paths.
     /// </summary>
-    private static async Task<SdkIndex?> BuildIndexAsync(string sourcePath, string root, List<string> assemblies)
+    /// <param name="sourceDescription">Human-readable description of the SDK source (nupkg path, DLL path, or assembly count).</param>
+    /// <param name="root">Root directory containing the indexed assemblies.</param>
+    /// <param name="assemblies">Paths to the assembly DLLs to index.</param>
+    private static async Task<SdkIndex?> BuildIndexAsync(string sourceDescription, string root, List<string> assemblies)
     {
         // Load metadata and collect type names and constants without executing code
         MetadataReader.DiscoveryResult discovery = MetadataReader.DiscoverTypes(assemblies);
@@ -171,11 +211,11 @@ public sealed class SdkIndex
 
         await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
             $"{discovery.ConnectorNames.Count} connector names, " +
-            $"{discovery.TriggerOperations.Values.Sum(v => v.Length)} trigger operations across " +
+            $"{discovery.TriggerOperations.Values.Sum(operations => operations.Length)} trigger operations across " +
             $"{discovery.TriggerOperations.Count} connectors");
 
         return new SdkIndex(
-            sourcePath,
+            sourceDescription,
             root,
             assemblies,
             discovery.Types,

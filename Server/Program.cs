@@ -44,13 +44,13 @@ internal static class Program
                 await Console.Error.WriteLineAsync("[SdkLspServer] Debugger attached, continuing...");
             }
 
-            // Determine the SDK path from command line, environment variable, or local SDK folder
+            // Determine the SDK path from command line or local SDK folder
             (string? sdkPath, string sdkSource, bool isAssembly) = ResolveSdkPath(args);
 
             // Index the provided SDK. When --sdk-assembly is used, index directly from DLL(s)
             // without nupkg extraction. Otherwise, extract and index the nupkg.
             SdkIndex? index = isAssembly
-                ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath!)
+                ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath!.Split(Path.PathSeparator))
                 : await SdkIndex.TryCreateAsync(sdkPath);
             if (index is null)
             {
@@ -309,10 +309,17 @@ internal static class Program
                 return (args[i]["--sdk=".Length..], "arg", false);
             }
 
-            // --sdk-assembly /path/to/Microsoft.Azure.Connectors.Sdk.dll
+            // --sdk-assembly /path/to/Assembly1.dll /path/to/Assembly2.dll ...
             if (args[i] == "--sdk-assembly" && i + 1 < args.Length)
             {
-                return (args[i + 1], "arg-assembly", true);
+                // Collect all subsequent non-flag arguments as assembly paths
+                var paths = new List<string>();
+                for (int j = i + 1; j < args.Length && !args[j].StartsWith("--", StringComparison.Ordinal); j++)
+                {
+                    paths.Add(args[j]);
+                }
+
+                return (string.Join(Path.PathSeparator.ToString(), paths), "arg-assembly", true);
             }
 
             if (args[i].StartsWith("--sdk-assembly=", StringComparison.Ordinal))
