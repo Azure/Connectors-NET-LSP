@@ -277,8 +277,8 @@ async function resolveSdkPath(
     context?: vscode.ExtensionContext,
     outputChannel?: vscode.OutputChannel
 ): Promise<SdkResolution | undefined> {
-    // 1. Explicit setting — accepts either nupkg or DLL
-    const configured = config.get<string>("sdkNupkgPath") || config.get<string>("sdkPath");
+    // 1. Explicit setting — prefer new sdkPath, fall back to deprecated sdkNupkgPath
+    const configured = config.get<string>("sdkPath") || config.get<string>("sdkNupkgPath");
     if (configured && await fileExists(configured)) {
         const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
         return { path: configured, type, source: "setting" };
@@ -288,7 +288,7 @@ async function resolveSdkPath(
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
         for (const folder of workspaceFolders) {
-            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel);
+            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel, 1);
             if (dllPath) {
                 return { path: dllPath, type: "assembly", source: "project-assets" };
             }
@@ -324,9 +324,10 @@ const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
 
 async function findSdkFromProjectAssets(
     folderPath: string,
-    outputChannel?: vscode.OutputChannel
+    outputChannel?: vscode.OutputChannel,
+    maxDepth: number = 1
 ): Promise<string | undefined> {
-    // Find .csproj files in the folder and its immediate subdirectories (one level deep).
+    // Find .csproj files in the folder. If maxDepth > 0, also check immediate subdirectories.
     try {
         const entries = await fs.promises.readdir(folderPath);
         const csprojFiles = entries.filter((f) => f.endsWith(".csproj"));
@@ -389,24 +390,26 @@ async function findSdkFromProjectAssets(
             }
         }
 
-        // Also check subdirectories one level deep (e.g., Connectors-NET-Samples/DirectConnector/)
-        for (const entry of entries) {
-            const subDir = path.join(folderPath, entry);
-            try {
-                const subStat = await fs.promises.stat(subDir);
-                if (!subStat.isDirectory()) {
+        // Also check subdirectories if depth budget remains
+        if (maxDepth > 0) {
+            for (const entry of entries) {
+                const subDir = path.join(folderPath, entry);
+                try {
+                    const subStat = await fs.promises.stat(subDir);
+                    if (!subStat.isDirectory()) {
+                        continue;
+                    }
+
+                    const subEntries = await fs.promises.readdir(subDir);
+                    if (subEntries.some((f) => f.endsWith(".csproj"))) {
+                        const result = await findSdkFromProjectAssets(subDir, outputChannel, maxDepth - 1);
+                        if (result) {
+                            return result;
+                        }
+                    }
+                } catch {
                     continue;
                 }
-
-                const subEntries = await fs.promises.readdir(subDir);
-                if (subEntries.some((f) => f.endsWith(".csproj"))) {
-                    const result = await findSdkFromProjectAssets(subDir, outputChannel);
-                    if (result) {
-                        return result;
-                    }
-                }
-            } catch {
-                continue;
             }
         }
     } catch {
