@@ -45,11 +45,13 @@ internal static class Program
             }
 
             // Determine the SDK path from command line, environment variable, or local SDK folder
-            (string? sdkPath, string sdkSource) = ResolveSdkPath(args);
+            (string? sdkPath, string sdkSource, bool isAssembly) = ResolveSdkPath(args);
 
-            // Index the provided NuGet package, if any. This happens on startup
-            // so that handlers can supply information to clients.
-            SdkIndex? index = await SdkIndex.TryCreateAsync(sdkPath);
+            // Index the provided SDK. When --sdk-assembly is used, index directly from DLL(s)
+            // without nupkg extraction. Otherwise, extract and index the nupkg.
+            SdkIndex? index = isAssembly
+                ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath!)
+                : await SdkIndex.TryCreateAsync(sdkPath);
             if (index is null)
             {
                 await Console.Error.WriteLineAsync($"[SdkLspServer] Could not load SDK from: {sdkPath ?? "(none)"}");
@@ -190,7 +192,7 @@ internal static class Program
                         // Report whether the SDK index was loaded successfully.
                         if (index is null)
                         {
-                            s.Window.ShowError($"SDK failed to load (source: {sdkSource}). Provide a .nupkg path via --sdk /path/file.nupkg");
+                            s.Window.ShowError($"SDK failed to load (source: {sdkSource}). Provide a .nupkg path via --sdk /path/file.nupkg or a DLL path via --sdk-assembly /path/file.dll");
 
                             telemetryService?.TrackEvent("SDK_Load_Failed", new Dictionary<string, string>
                             {
@@ -290,27 +292,40 @@ internal static class Program
 
     /// <summary>
     /// Parse command-line arguments or environment variables to determine
-    /// the path to the SDK .nupkg file.
+    /// the path to the SDK .nupkg file or assembly DLL.
     /// </summary>
-    private static (string? Path, string Source) ResolveSdkPath(string[] args)
+    private static (string? Path, string Source, bool IsAssembly) ResolveSdkPath(string[] args)
     {
         // CLI: --sdk /path/to/sdk.nupkg or --sdk=/path/to/sdk.nupkg
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--sdk" && i + 1 < args.Length)
             {
-                return (args[i + 1], "arg");
+                return (args[i + 1], "arg", false);
             }
 
             if (args[i].StartsWith("--sdk="))
             {
-                return (args[i]["--sdk=".Length..], "arg");
+                return (args[i]["--sdk=".Length..], "arg", false);
+            }
+
+            // --sdk-assembly /path/to/Microsoft.Azure.Connectors.Sdk.dll
+            if (args[i] == "--sdk-assembly" && i + 1 < args.Length)
+            {
+                return (args[i + 1], "arg-assembly", true);
+            }
+
+            if (args[i].StartsWith("--sdk-assembly="))
+            {
+                return (args[i]["--sdk-assembly=".Length..], "arg-assembly", true);
             }
         }
 
         // Fallback: search for a .nupkg inside an SDK folder up the tree
         string? candidate = TryFindNupkgInSdkFolder();
-        return !string.IsNullOrWhiteSpace(candidate) ? ((string? Path, string Source))(candidate, "sdk-folder") : ((string? Path, string Source))(null, "none");
+        return !string.IsNullOrWhiteSpace(candidate)
+            ? (candidate, "sdk-folder", false)
+            : (null, "none", false);
     }
 
     private static string? TryFindNupkgInSdkFolder()

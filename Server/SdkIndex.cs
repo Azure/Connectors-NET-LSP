@@ -117,32 +117,70 @@ public sealed class SdkIndex
         {
             List<string> assemblies = await NupkgLoader.ExtractAndFindAssembliesAsync(nupkgPath, extractRoot);
 
-            // Load metadata and collect type names and constants without executing code
-            MetadataReader.DiscoveryResult discovery = MetadataReader.DiscoverTypes(assemblies);
-            if (discovery.Failures.Count > 0)
-            {
-                await Console.Error.WriteLineAsync("[SdkLspServer] Failed to read some assemblies:\n  " +
-                    string.Join("\n  ", discovery.Failures.Select(f => $"{f.Path}: {f.Error}")));
-            }
-
-            await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
-                $"{discovery.ConnectorNames.Count} connector names, " +
-                $"{discovery.TriggerOperations.Values.Sum(v => v.Length)} trigger operations across " +
-                $"{discovery.TriggerOperations.Count} connectors");
-
-            return new SdkIndex(
-                nupkgPath,
-                extractRoot,
-                assemblies,
-                discovery.Types,
-                discovery.ConnectorNames,
-                discovery.TriggerOperations);
+            return await BuildIndexAsync(nupkgPath, extractRoot, assemblies);
         }
         catch (Exception ex)
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] Indexing failed: {ex}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Attempts to create an index from one or more assembly DLL paths on disk
+    /// (e.g., from the NuGet cache). No nupkg extraction is needed — the DLLs
+    /// are read directly via MetadataLoadContext.
+    /// </summary>
+    /// <param name="assemblyPaths">One or more paths to SDK assembly DLLs.</param>
+    public static async Task<SdkIndex?> TryCreateFromAssembliesAsync(params string[] assemblyPaths)
+    {
+        List<string> validPaths = assemblyPaths.Where(File.Exists).ToList();
+        if (validPaths.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            string sourceDescription = validPaths.Count == 1
+                ? validPaths[0]
+                : $"{validPaths.Count} assemblies";
+            string containingDir = Path.GetDirectoryName(validPaths[0]) ?? string.Empty;
+
+            return await BuildIndexAsync(sourceDescription, containingDir, validPaths);
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"[SdkLspServer] Assembly indexing failed: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Shared indexing logic used by both nupkg and direct-assembly creation paths.
+    /// </summary>
+    private static async Task<SdkIndex?> BuildIndexAsync(string sourcePath, string root, List<string> assemblies)
+    {
+        // Load metadata and collect type names and constants without executing code
+        MetadataReader.DiscoveryResult discovery = MetadataReader.DiscoverTypes(assemblies);
+        if (discovery.Failures.Count > 0)
+        {
+            await Console.Error.WriteLineAsync("[SdkLspServer] Failed to read some assemblies:\n  " +
+                string.Join("\n  ", discovery.Failures.Select(f => $"{f.Path}: {f.Error}")));
+        }
+
+        await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
+            $"{discovery.ConnectorNames.Count} connector names, " +
+            $"{discovery.TriggerOperations.Values.Sum(v => v.Length)} trigger operations across " +
+            $"{discovery.TriggerOperations.Count} connectors");
+
+        return new SdkIndex(
+            sourcePath,
+            root,
+            assemblies,
+            discovery.Types,
+            discovery.ConnectorNames,
+            discovery.TriggerOperations);
     }
 
     /// <summary>
