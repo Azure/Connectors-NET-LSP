@@ -319,6 +319,11 @@ internal static class Program
                     paths.Add(args[j]);
                 }
 
+                if (paths.Count == 0)
+                {
+                    return (null, "arg-assembly-missing", true);
+                }
+
                 return (string.Join(Path.PathSeparator.ToString(), paths), "arg-assembly", true);
             }
 

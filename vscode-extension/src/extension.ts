@@ -400,12 +400,9 @@ async function findSdkFromProjectAssets(
                         continue;
                     }
 
-                    const subEntries = await fs.promises.readdir(subDir);
-                    if (subEntries.some((f) => f.endsWith(".csproj"))) {
-                        const result = await findSdkFromProjectAssets(subDir, outputChannel, maxDepth - 1);
-                        if (result) {
-                            return result;
-                        }
+                    const result = await findSdkFromProjectAssets(subDir, outputChannel, maxDepth - 1);
+                    if (result) {
+                        return result;
                     }
                 } catch {
                     continue;
