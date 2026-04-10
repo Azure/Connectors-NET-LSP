@@ -291,8 +291,8 @@ internal static class Program
     }
 
     /// <summary>
-    /// Parse command-line arguments or environment variables to determine
-    /// the path to the SDK .nupkg file or assembly DLL.
+    /// Parse command-line arguments to determine the path to the SDK
+    /// .nupkg file or assembly DLL, falling back to a local SDK/ folder search.
     /// </summary>
     private static (string? Path, string Source, bool IsAssembly) ResolveSdkPath(string[] args)
     {
@@ -304,7 +304,7 @@ internal static class Program
                 return (args[i + 1], "arg", false);
             }
 
-            if (args[i].StartsWith("--sdk="))
+            if (args[i].StartsWith("--sdk=", StringComparison.Ordinal))
             {
                 return (args[i]["--sdk=".Length..], "arg", false);
             }
@@ -315,7 +315,7 @@ internal static class Program
                 return (args[i + 1], "arg-assembly", true);
             }
 
-            if (args[i].StartsWith("--sdk-assembly="))
+            if (args[i].StartsWith("--sdk-assembly=", StringComparison.Ordinal))
             {
                 return (args[i]["--sdk-assembly=".Length..], "arg-assembly", true);
             }

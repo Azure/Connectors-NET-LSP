@@ -196,4 +196,44 @@ public class SdkIndexConstantDiscoveryTests
 
         Assert.IsTrue(payloadTypes.Count >= 5, $"Should have at least 5 trigger payload types, found {payloadTypes.Count}");
     }
+
+    [TestMethod]
+    public async Task TryCreateFromAssembliesAsync_ProducesSameResults_AsNupkgPath()
+    {
+        SkipIfNoSdk();
+
+        // Get the DLL paths from the nupkg-based index
+        var dllPaths = SdkIndex.AssemblyPaths
+            .Where(p => Path.GetFileName(p).StartsWith("Microsoft.Azure.Connectors.Sdk", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.IsTrue(dllPaths.Length > 0, "Should have at least one SDK assembly");
+
+        // Create a second index from the DLL paths directly
+        var assemblyIndex = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync(dllPaths);
+        Assert.IsNotNull(assemblyIndex, "TryCreateFromAssembliesAsync should succeed for valid DLL paths");
+
+        // Verify same connector constants are discovered
+        Assert.AreEqual(
+            SdkIndex.ConnectorNameConstants.Length,
+            assemblyIndex.ConnectorNameConstants.Length,
+            "Assembly-based index should discover the same connector name constants");
+
+        var nupkgNames = SdkIndex.ConnectorNameConstants.Select(c => c.Value).OrderBy(v => v, StringComparer.Ordinal).ToList();
+        var assemblyNames = assemblyIndex.ConnectorNameConstants.Select(c => c.Value).OrderBy(v => v, StringComparer.Ordinal).ToList();
+        CollectionAssert.AreEqual(nupkgNames, assemblyNames, "Connector names should match between nupkg and assembly indexing");
+
+        // Verify same trigger operations are discovered
+        Assert.AreEqual(
+            SdkIndex.TriggerOperationsByConnector.Count,
+            assemblyIndex.TriggerOperationsByConnector.Count,
+            "Assembly-based index should discover the same trigger operation groups");
+    }
+
+    [TestMethod]
+    public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNull()
+    {
+        var result = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync("/nonexistent/path.dll");
+        Assert.IsNull(result);
+    }
 }

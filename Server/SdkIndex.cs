@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 namespace SdkLspServer;
 
 /// <summary>
-/// Represents an indexed SDK extracted from a NuGet package. It holds lists of
-/// assemblies and type names discovered in the package. The index is loaded
-/// eagerly on startup to avoid reflection during request handling.
+/// Represents an indexed SDK loaded from a NuGet package or assembly DLLs. It
+/// holds lists of assemblies and type names discovered in the package. The index
+/// is loaded eagerly on startup to avoid reflection during request handling.
 /// </summary>
 public sealed class SdkIndex
 {
-    /// <summary>Gets the source .nupkg path used to create this index.</summary>
-    public string SourceNupkgPath { get; }
+    /// <summary>Gets a description of the source used to create this index (nupkg path, DLL path, or a count of assemblies).</summary>
+    public string Source { get; }
 
-    /// <summary>Gets the root directory where the nupkg contents were extracted.</summary>
-    public string ExtractRoot { get; }
+    /// <summary>Gets the root directory containing the indexed assemblies (extraction directory for nupkg, containing directory for DLLs).</summary>
+    public string RootDirectory { get; }
 
     /// <summary>Gets list of discovered assembly DLL paths.</summary>
     public ImmutableArray<string> AssemblyPaths { get; }
@@ -37,15 +37,15 @@ public sealed class SdkIndex
     public string Summary => $"{AssemblyPaths.Length} assemblies, {TypeNames.Length} types";
 
     private SdkIndex(
-        string nupkg,
+        string source,
         string root,
         IEnumerable<string> assemblies,
         IEnumerable<string> types,
         IEnumerable<SdkConstant> connectorNames,
         IDictionary<string, ImmutableArray<SdkConstant>> triggerOps)
     {
-        SourceNupkgPath = nupkg;
-        ExtractRoot = root;
+        Source = source;
+        RootDirectory = root;
         AssemblyPaths = assemblies.ToImmutableArray();
         TypeNames = types.ToImmutableArray();
         ConnectorNameConstants = connectorNames.ToImmutableArray();

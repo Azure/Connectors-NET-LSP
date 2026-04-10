@@ -280,7 +280,7 @@ async function resolveSdkPath(
     // 1. Explicit setting — accepts either nupkg or DLL
     const configured = config.get<string>("sdkNupkgPath") || config.get<string>("sdkPath");
     if (configured && await fileExists(configured)) {
-        const type = configured.endsWith(".dll") ? "assembly" as const : "nupkg" as const;
+        const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
         return { path: configured, type, source: "setting" };
     }
 
@@ -326,7 +326,7 @@ async function findSdkFromProjectAssets(
     folderPath: string,
     outputChannel?: vscode.OutputChannel
 ): Promise<string | undefined> {
-    // Find .csproj files in the folder (non-recursive, immediate children)
+    // Find .csproj files in the folder and its immediate subdirectories (one level deep).
     try {
         const entries = await fs.promises.readdir(folderPath);
         const csprojFiles = entries.filter((f) => f.endsWith(".csproj"));
