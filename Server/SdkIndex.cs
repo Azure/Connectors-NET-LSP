@@ -134,6 +134,11 @@ public sealed class SdkIndex
     /// <param name="assemblyPaths">One or more paths to SDK assembly DLLs.</param>
     public static async Task<SdkIndex?> TryCreateFromAssembliesAsync(params string[] assemblyPaths)
     {
+        if (assemblyPaths is null || assemblyPaths.Length == 0)
+        {
+            return null;
+        }
+
         List<string> validPaths = assemblyPaths.Where(File.Exists).ToList();
         if (validPaths.Count == 0)
         {
@@ -214,7 +219,7 @@ public sealed class SdkIndex
         if (discovery.Failures.Count > 0)
         {
             await Console.Error.WriteLineAsync("[SdkLspServer] Failed to read some assemblies:\n  " +
-                string.Join("\n  ", discovery.Failures.Select(f => $"{f.Path}: {f.Error}")));
+                string.Join("\n  ", discovery.Failures.Select(failure => $"{failure.Path}: {failure.Error}")));
         }
 
         await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
