@@ -53,5 +53,10 @@ public class ApiServiceConfig
         {
             BearerToken = updateConfig.BearerToken;
         }
+
+        if (!string.IsNullOrEmpty(updateConfig.ApiVersion))
+        {
+            ApiVersion = updateConfig.ApiVersion;
+        }
     }
 }
