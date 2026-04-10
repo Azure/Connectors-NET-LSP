@@ -348,9 +348,10 @@ async function findSdkFromProjectAssets(
                     targets?: Record<string, Record<string, { compile?: Record<string, unknown> }>>;
                 };
 
-                // Find the SDK library entry
+                // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
+                const sdkPackagePrefix = (SDK_PACKAGE_NAME + "/").toLowerCase();
                 const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
-                    key.startsWith(SDK_PACKAGE_NAME + "/")
+                    key.toLowerCase().startsWith(sdkPackagePrefix)
                 );
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
