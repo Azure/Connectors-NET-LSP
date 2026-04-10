@@ -45,21 +45,24 @@ internal static class Program
             }
 
             // Determine the SDK path from command line or local SDK folder
-            (string? sdkPath, string sdkSource, bool isAssembly) = ResolveSdkPath(args);
+            SdkPathResult sdkResolution = ResolveSdkPath(args);
+            string sdkSource = sdkResolution.Source;
 
             // Index the provided SDK. When --sdk-assembly is used, index directly from DLL(s)
             // without nupkg extraction. Otherwise, extract and index the nupkg.
             SdkIndex? index = null;
-            if (!string.IsNullOrEmpty(sdkPath))
+            if (sdkResolution.AssemblyPaths != null)
             {
-                index = isAssembly
-                    ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath.Split(Path.PathSeparator))
-                    : await SdkIndex.TryCreateAsync(sdkPath);
+                index = await SdkIndex.TryCreateFromAssembliesAsync(sdkResolution.AssemblyPaths);
+            }
+            else if (!string.IsNullOrEmpty(sdkResolution.NupkgPath))
+            {
+                index = await SdkIndex.TryCreateAsync(sdkResolution.NupkgPath);
             }
 
             if (index is null)
             {
-                await Console.Error.WriteLineAsync($"[SdkLspServer] Could not load SDK from: {sdkPath ?? "(none)"}");
+                await Console.Error.WriteLineAsync($"[SdkLspServer] Could not load SDK from: {sdkResolution.DisplayPath}");
             }
 
             // Create config instance that will be populated from initializationOptions
@@ -296,22 +299,41 @@ internal static class Program
     }
 
     /// <summary>
+    /// Resolved SDK path information returned by <see cref="ResolveSdkPath"/>.
+    /// </summary>
+    private sealed class SdkPathResult
+    {
+        /// <summary>Gets the nupkg path (mutually exclusive with AssemblyPaths).</summary>
+        public string? NupkgPath { get; init; }
+
+        /// <summary>Gets the assembly DLL paths (mutually exclusive with NupkgPath).</summary>
+        public string[]? AssemblyPaths { get; init; }
+
+        /// <summary>Gets a description of where the SDK was found.</summary>
+        public string Source { get; init; } = "none";
+
+        public bool IsAssembly => AssemblyPaths != null;
+
+        public string DisplayPath => NupkgPath ?? (AssemblyPaths != null ? string.Join(", ", AssemblyPaths) : "(none)");
+    }
+
+    /// <summary>
     /// Parse command-line arguments to determine the path to the SDK
     /// .nupkg file or assembly DLL, falling back to a local SDK/ folder search.
     /// </summary>
-    private static (string? Path, string Source, bool IsAssembly) ResolveSdkPath(string[] args)
+    private static SdkPathResult ResolveSdkPath(string[] args)
     {
         // CLI: --sdk /path/to/sdk.nupkg or --sdk=/path/to/sdk.nupkg
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--sdk" && i + 1 < args.Length)
             {
-                return (args[i + 1], "arg", false);
+                return new SdkPathResult { NupkgPath = args[i + 1], Source = "arg" };
             }
 
             if (args[i].StartsWith("--sdk=", StringComparison.Ordinal))
             {
-                return (args[i]["--sdk=".Length..], "arg", false);
+                return new SdkPathResult { NupkgPath = args[i]["--sdk=".Length..], Source = "arg" };
             }
 
             // --sdk-assembly /path/to/Assembly1.dll /path/to/Assembly2.dll ...
@@ -326,10 +348,10 @@ internal static class Program
 
                 if (paths.Count == 0)
                 {
-                    return (null, "arg-assembly-missing", true);
+                    return new SdkPathResult { Source = "arg-assembly-missing" };
                 }
 
-                return (string.Join(Path.PathSeparator.ToString(), paths), "arg-assembly", true);
+                return new SdkPathResult { AssemblyPaths = paths.ToArray(), Source = "arg-assembly" };
             }
 
             if (args[i].StartsWith("--sdk-assembly=", StringComparison.Ordinal))
@@ -337,18 +359,18 @@ internal static class Program
                 string assemblyValue = args[i]["--sdk-assembly=".Length..];
                 if (string.IsNullOrEmpty(assemblyValue))
                 {
-                    return (null, "arg-assembly-missing", true);
+                    return new SdkPathResult { Source = "arg-assembly-missing" };
                 }
 
-                return (assemblyValue, "arg-assembly", true);
+                return new SdkPathResult { AssemblyPaths = [assemblyValue], Source = "arg-assembly" };
             }
         }
 
         // Fallback: search for a .nupkg inside an SDK folder up the tree
         string? candidate = TryFindNupkgInSdkFolder();
         return !string.IsNullOrWhiteSpace(candidate)
-            ? (candidate, "sdk-folder", false)
-            : (null, "none", false);
+            ? new SdkPathResult { NupkgPath = candidate, Source = "sdk-folder" }
+            : new SdkPathResult { Source = "none" };
     }
 
     private static string? TryFindNupkgInSdkFolder()

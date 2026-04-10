@@ -137,11 +137,11 @@ async function startLanguageServer(
     const sdkResult = await resolveSdkPath(config, context, outputChannel);
     if (sdkResult) {
         if (sdkResult.type === "assembly") {
-            args.push("--sdk-assembly", sdkResult.path);
-            outputChannel.appendLine(`SDK assembly: ${sdkResult.path} (source: ${sdkResult.source})`);
+            args.push("--sdk-assembly", ...sdkResult.paths);
+            outputChannel.appendLine(`SDK assembly: ${sdkResult.paths.join(", ")} (source: ${sdkResult.source})`);
         } else {
-            args.push("--sdk", sdkResult.path);
-            outputChannel.appendLine(`SDK .nupkg: ${sdkResult.path} (source: ${sdkResult.source})`);
+            args.push("--sdk", sdkResult.paths[0]);
+            outputChannel.appendLine(`SDK .nupkg: ${sdkResult.paths[0]} (source: ${sdkResult.source})`);
         }
     }
 
@@ -267,7 +267,7 @@ async function resolveServerPath(
 }
 
 interface SdkResolution {
-    path: string;
+    paths: string[];
     type: "nupkg" | "assembly";
     source: string;
 }
@@ -281,16 +281,16 @@ async function resolveSdkPath(
     const configured = config.get<string>("sdkPath") || config.get<string>("sdkNupkgPath");
     if (configured && await fileExists(configured)) {
         const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
-        return { path: configured, type, source: "setting" };
+        return { paths: [configured], type, source: "setting" };
     }
 
     // 2. Workspace project NuGet references — parse project.assets.json
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
         for (const folder of workspaceFolders) {
-            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel, 3);
-            if (dllPath) {
-                return { path: dllPath, type: "assembly", source: "project-assets" };
+            const dllPaths = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel, 3);
+            if (dllPaths && dllPaths.length > 0) {
+                return { paths: dllPaths, type: "assembly", source: "project-assets" };
             }
         }
     }
@@ -300,7 +300,7 @@ async function resolveSdkPath(
         for (const folder of workspaceFolders) {
             const found = await findNewestNupkgInDir(path.join(folder.uri.fsPath, "SDK"));
             if (found) {
-                return { path: found, type: "nupkg", source: "workspace-sdk-folder" };
+                return { paths: [found], type: "nupkg", source: "workspace-sdk-folder" };
             }
         }
     }
@@ -313,7 +313,7 @@ async function resolveSdkPath(
         );
         const found = await findNewestNupkgInDir(sdkRepoBuildDir);
         if (found) {
-            return { path: found, type: "nupkg", source: "sibling-repo" };
+            return { paths: [found], type: "nupkg", source: "sibling-repo" };
         }
     }
 
@@ -326,7 +326,7 @@ async function findSdkFromProjectAssets(
     folderPath: string,
     outputChannel?: vscode.OutputChannel,
     maxDepth: number = 1
-): Promise<string | undefined> {
+): Promise<string[] | undefined> {
     // Find .csproj files in the folder. If maxDepth > 0, recursively check subdirectories up to maxDepth levels deep.
     try {
         const entries = await fs.promises.readdir(folderPath);
@@ -402,9 +402,9 @@ async function findSdkFromProjectAssets(
 
                 if (resolvedDllPaths.length > 0) {
                     outputChannel?.appendLine(
-                        `SDK discovered from ${csproj} \u2192 ${sdkLibKey} \u2192 ${resolvedDllPaths.join(path.delimiter)}`
+                        `SDK discovered from ${csproj} \u2192 ${sdkLibKey} \u2192 ${resolvedDllPaths.join(", ")}`
                     );
-                    return resolvedDllPaths.join(path.delimiter);
+                    return resolvedDllPaths;
                 }
             } catch (err) {
                 outputChannel?.appendLine(
