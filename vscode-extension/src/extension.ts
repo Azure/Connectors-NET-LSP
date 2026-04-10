@@ -134,7 +134,7 @@ async function startLanguageServer(
     // Build command-line arguments
     const args: string[] = [];
 
-    const sdkPath = await resolveSdkNupkgPath(config);
+    const sdkPath = await resolveSdkNupkgPath(config, context);
     if (sdkPath) {
         args.push("--sdk", sdkPath);
         outputChannel.appendLine(`SDK .nupkg: ${sdkPath}`);
@@ -261,52 +261,76 @@ async function resolveServerPath(
     return undefined;
 }
 
-async function resolveSdkNupkgPath(config: vscode.WorkspaceConfiguration): Promise<string | undefined> {
+async function resolveSdkNupkgPath(
+    config: vscode.WorkspaceConfiguration,
+    context?: vscode.ExtensionContext
+): Promise<string | undefined> {
+    // 1. Explicit setting — always wins
     const configured = config.get<string>("sdkNupkgPath");
     if (configured && await fileExists(configured)) {
         return configured;
     }
 
-    // Search workspace for .nupkg files
+    // 2. Workspace SDK/ folder — search each workspace folder for an SDK/ directory
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        return undefined;
+    if (workspaceFolders) {
+        for (const folder of workspaceFolders) {
+            const found = await findNewestNupkgInDir(path.join(folder.uri.fsPath, "SDK"));
+            if (found) {
+                return found;
+            }
+        }
     }
 
-    for (const folder of workspaceFolders) {
-        const sdkDir = path.join(folder.uri.fsPath, "SDK");
-        try {
-            const stat = await fs.promises.stat(sdkDir);
-            if (!stat.isDirectory()) {
-                continue;
-            }
-
-            const entries = await fs.promises.readdir(sdkDir);
-            const nupkgFiles = entries.filter((f) => f.endsWith(".nupkg"));
-            if (nupkgFiles.length > 0) {
-                const nupkgWithStats = await Promise.all(
-                    nupkgFiles.map(async (file) => {
-                        const fullPath = path.join(sdkDir, file);
-                        const fileStat = await fs.promises.stat(fullPath);
-                        return { file, fullPath, mtimeMs: fileStat.mtimeMs };
-                    }),
-                );
-
-                nupkgWithStats.sort((a, b) => {
-                    if (b.mtimeMs !== a.mtimeMs) {
-                        return b.mtimeMs - a.mtimeMs;
-                    }
-                    return a.file.localeCompare(b.file);
-                });
-
-                return nupkgWithStats[0].fullPath;
-            }
-        } catch {
-            continue;
+    // 3. Sibling SDK repo build output (development scenario — F5 from vscode-extension/)
+    //    When the extension is launched from vscode-extension/, the Connectors-NET-SDK repo
+    //    may be a sibling: ../../Connectors-NET-SDK/src/*/bin/Debug/*.nupkg
+    if (context) {
+        const sdkRepoBuildDir = path.join(
+            context.extensionPath, "..", "..",
+            "Connectors-NET-SDK", "src", "Microsoft.Azure.Connectors.Sdk", "bin", "Debug"
+        );
+        const found = await findNewestNupkgInDir(sdkRepoBuildDir);
+        if (found) {
+            return found;
         }
     }
 
     return undefined;
+}
+
+async function findNewestNupkgInDir(dirPath: string): Promise<string | undefined> {
+    try {
+        const stat = await fs.promises.stat(dirPath);
+        if (!stat.isDirectory()) {
+            return undefined;
+        }
+
+        const entries = await fs.promises.readdir(dirPath);
+        const nupkgFiles = entries.filter((f) => f.endsWith(".nupkg"));
+        if (nupkgFiles.length === 0) {
+            return undefined;
+        }
+
+        const nupkgWithStats = await Promise.all(
+            nupkgFiles.map(async (file) => {
+                const fullPath = path.join(dirPath, file);
+                const fileStat = await fs.promises.stat(fullPath);
+                return { file, fullPath, mtimeMs: fileStat.mtimeMs };
+            }),
+        );
+
+        nupkgWithStats.sort((a, b) => {
+            if (b.mtimeMs !== a.mtimeMs) {
+                return b.mtimeMs - a.mtimeMs;
+            }
+            return a.file.localeCompare(b.file);
+        });
+
+        return nupkgWithStats[0].fullPath;
+    } catch {
+        return undefined;
+    }
 }
 
 interface ConnectionsConfig {
