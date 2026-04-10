@@ -327,7 +327,7 @@ async function findSdkFromProjectAssets(
     outputChannel?: vscode.OutputChannel,
     maxDepth: number = 1
 ): Promise<string | undefined> {
-    // Find .csproj files in the folder. If maxDepth > 0, also check immediate subdirectories.
+    // Find .csproj files in the folder. If maxDepth > 0, recursively check subdirectories up to maxDepth levels deep.
     try {
         const entries = await fs.promises.readdir(folderPath);
         const csprojFiles = entries.filter((f) => f.endsWith(".csproj"));
