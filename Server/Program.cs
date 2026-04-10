@@ -334,7 +334,13 @@ internal static class Program
 
             if (args[i].StartsWith("--sdk-assembly=", StringComparison.Ordinal))
             {
-                return (args[i]["--sdk-assembly=".Length..], "arg-assembly", true);
+                string assemblyValue = args[i]["--sdk-assembly=".Length..];
+                if (string.IsNullOrEmpty(assemblyValue))
+                {
+                    return (null, "arg-assembly-missing", true);
+                }
+
+                return (assemblyValue, "arg-assembly", true);
             }
         }
 

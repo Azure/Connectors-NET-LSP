@@ -53,7 +53,14 @@ STYLE_ERRORS=0
 
 if [[ -n "$STAGED_CS" ]]; then
   # Single-letter lambda parameters (but allow 'ex' for exceptions)
-  LAMBDA_HITS=$(echo "$STAGED_CS" | xargs grep -Pn '\b[a-z]\b\s*=>' -- 2>/dev/null | grep -Pv '\b(ex|e)\s*=>' || true)
+  # Uses awk instead of grep -P for macOS/BSD compatibility
+  LAMBDA_HITS=""
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    FILE_HITS=$(awk '/[^[:alnum:]_][a-z][[:space:]]*=>/ && !/[^[:alnum:]_](ex|e)[[:space:]]*=>/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
+    [[ -n "$FILE_HITS" ]] && LAMBDA_HITS+="$FILE_HITS"$'\n'
+  done <<< "$STAGED_CS"
+  LAMBDA_HITS=$(echo "$LAMBDA_HITS" | sed '/^$/d')
   if [[ -n "$LAMBDA_HITS" ]]; then
     echo "[pre-commit] ⚠️  Single-letter lambda parameters found (use descriptive names):"
     echo "$LAMBDA_HITS" | head -10
@@ -61,7 +68,13 @@ if [[ -n "$STAGED_CS" ]]; then
   fi
 
   # ConfigureAwait(false) without named parameter
-  CA_HITS=$(echo "$STAGED_CS" | xargs grep -Pn 'ConfigureAwait\(false\)' -- 2>/dev/null || true)
+  CA_HITS=""
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    FILE_HITS=$(awk '/ConfigureAwait\(false\)/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
+    [[ -n "$FILE_HITS" ]] && CA_HITS+="$FILE_HITS"$'\n'
+  done <<< "$STAGED_CS"
+  CA_HITS=$(echo "$CA_HITS" | sed '/^$/d')
   if [[ -n "$CA_HITS" ]]; then
     echo "[pre-commit] ⚠️  ConfigureAwait(false) without named parameter:"
     echo "$CA_HITS" | head -10

@@ -288,7 +288,7 @@ async function resolveSdkPath(
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
         for (const folder of workspaceFolders) {
-            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel, 1);
+            const dllPath = await findSdkFromProjectAssets(folder.uri.fsPath, outputChannel, 3);
             if (dllPath) {
                 return { path: dllPath, type: "assembly", source: "project-assets" };
             }
