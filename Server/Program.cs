@@ -49,9 +49,14 @@ internal static class Program
 
             // Index the provided SDK. When --sdk-assembly is used, index directly from DLL(s)
             // without nupkg extraction. Otherwise, extract and index the nupkg.
-            SdkIndex? index = isAssembly
-                ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath!.Split(Path.PathSeparator))
-                : await SdkIndex.TryCreateAsync(sdkPath);
+            SdkIndex? index = null;
+            if (!string.IsNullOrEmpty(sdkPath))
+            {
+                index = isAssembly
+                    ? await SdkIndex.TryCreateFromAssembliesAsync(sdkPath.Split(Path.PathSeparator))
+                    : await SdkIndex.TryCreateAsync(sdkPath);
+            }
+
             if (index is null)
             {
                 await Console.Error.WriteLineAsync($"[SdkLspServer] Could not load SDK from: {sdkPath ?? "(none)"}");

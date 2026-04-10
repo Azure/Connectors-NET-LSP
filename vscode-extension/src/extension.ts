@@ -360,16 +360,24 @@ async function findSdkFromProjectAssets(
                 const libraryPath = assets.libraries[sdkLibKey].path!;
                 const packageFolders = Object.keys(assets.packageFolders ?? {});
 
-                // Find compile assets from the first target framework
+                // Find compile assets from the first target framework that contains SDK DLLs
                 const targets = assets.targets ?? {};
-                const firstTargetKey = Object.keys(targets)[0];
-                if (!firstTargetKey) {
-                    continue;
+                let dllAssets: string[] = [];
+
+                for (const targetKey of Object.keys(targets)) {
+                    const targetPackage = targets[targetKey]?.[sdkLibKey];
+                    const compileAssets = targetPackage?.compile ?? {};
+                    const targetDlls = Object.keys(compileAssets).filter((asset) => asset.endsWith(".dll"));
+
+                    if (targetDlls.length > 0) {
+                        dllAssets = targetDlls;
+                        break;
+                    }
                 }
 
-                const targetPackage = targets[firstTargetKey][sdkLibKey];
-                const compileAssets = targetPackage?.compile ?? {};
-                const dllAssets = Object.keys(compileAssets).filter((a) => a.endsWith(".dll"));
+                if (dllAssets.length === 0) {
+                    continue;
+                }
 
                 // Resolve the DLL path from package folders
                 for (const dllRelPath of dllAssets) {
@@ -390,9 +398,14 @@ async function findSdkFromProjectAssets(
             }
         }
 
-        // Also check subdirectories if depth budget remains
+        // Also check subdirectories if depth budget remains (skip well-known irrelevant dirs)
+        const skipDirs = new Set(["node_modules", ".git", "bin", "obj", ".vs", ".vscode", "TestResults"]);
         if (maxDepth > 0) {
             for (const entry of entries) {
+                if (skipDirs.has(entry)) {
+                    continue;
+                }
+
                 const subDir = path.join(folderPath, entry);
                 try {
                     const subStat = await fs.promises.stat(subDir);
