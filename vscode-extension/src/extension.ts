@@ -379,17 +379,27 @@ async function findSdkFromProjectAssets(
                     continue;
                 }
 
-                // Resolve the DLL path from package folders
+                // Resolve all DLL paths from package folders so the server indexes every SDK assembly
+                const resolvedDllPaths: string[] = [];
+
                 for (const dllRelPath of dllAssets) {
                     for (const pkgFolder of packageFolders) {
                         const fullPath = path.join(pkgFolder, libraryPath, dllRelPath);
                         if (await fileExists(fullPath)) {
-                            outputChannel?.appendLine(
-                                `SDK discovered from ${csproj} → ${sdkLibKey} → ${fullPath}`
-                            );
-                            return fullPath;
+                            if (!resolvedDllPaths.includes(fullPath)) {
+                                resolvedDllPaths.push(fullPath);
+                            }
+
+                            break;
                         }
                     }
+                }
+
+                if (resolvedDllPaths.length > 0) {
+                    outputChannel?.appendLine(
+                        `SDK discovered from ${csproj} \u2192 ${sdkLibKey} \u2192 ${resolvedDllPaths.join(path.delimiter)}`
+                    );
+                    return resolvedDllPaths.join(path.delimiter);
                 }
             } catch (err) {
                 outputChannel?.appendLine(

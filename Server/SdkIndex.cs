@@ -190,7 +190,15 @@ public sealed class SdkIndex
             segments = segments[..matchCount];
         }
 
-        return segments.Length > 0 ? string.Join(Path.DirectorySeparatorChar, segments) : string.Empty;
+        string result = segments.Length > 0 ? string.Join(Path.DirectorySeparatorChar, segments) : string.Empty;
+
+        // Ensure drive-only roots are valid paths (e.g., "C:" -> "C:\\")
+        if (result.Length == 2 && result[1] == ':')
+        {
+            result += Path.DirectorySeparatorChar;
+        }
+
+        return result;
     }
 
     /// <summary>

@@ -197,7 +197,7 @@ internal static class Program
                         // Report whether the SDK index was loaded successfully.
                         if (index is null)
                         {
-                            s.Window.ShowError($"SDK failed to load (source: {sdkSource}). Provide a .nupkg path via --sdk /path/file.nupkg or a DLL path via --sdk-assembly /path/file.dll");
+                            s.Window.ShowError($"SDK failed to load (source: {sdkSource}). Provide a .nupkg path via --sdk /path/file.nupkg or a DLL path via --sdk-assembly /path/file.dll.");
 
                             telemetryService?.TrackEvent("SDK_Load_Failed", new Dictionary<string, string>
                             {

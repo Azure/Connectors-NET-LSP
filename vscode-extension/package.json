@@ -47,7 +47,7 @@
         "connectorSdk.sdkPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Connector SDK .nupkg or .dll file. If empty, the extension discovers the SDK from workspace project NuGet references."
+          "description": "Path to the Connector SDK .nupkg or .dll file. If empty, the extension discovers the SDK from workspace project NuGet references, then checks for an SDK/ folder in the workspace, and finally looks for a sibling repo build output."
         },
         "connectorSdk.lspServerPath": {
           "type": "string",

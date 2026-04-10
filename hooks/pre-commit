@@ -52,12 +52,12 @@ STAGED_CS=$(git diff --cached --name-only --diff-filter=ACMR -- '*.cs')
 STYLE_ERRORS=0
 
 if [[ -n "$STAGED_CS" ]]; then
-  # Single-letter lambda parameters (but allow 'ex' for exceptions)
+  # Single-letter lambda parameters (allow only 'ex' for exceptions)
   # Uses awk instead of grep -P for macOS/BSD compatibility
   LAMBDA_HITS=""
   while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    FILE_HITS=$(awk '/[^[:alnum:]_][a-z][[:space:]]*=>/ && !/[^[:alnum:]_](ex|e)[[:space:]]*=>/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
+    FILE_HITS=$(awk '/(^|[^[:alnum:]_])[a-z][[:space:]]*=>/ && !/(^|[^[:alnum:]_])ex[[:space:]]*=>/ { print FILENAME ":" FNR ":" $0 }' "$file" 2>/dev/null || true)
     [[ -n "$FILE_HITS" ]] && LAMBDA_HITS+="$FILE_HITS"$'\n'
   done <<< "$STAGED_CS"
   LAMBDA_HITS=$(echo "$LAMBDA_HITS" | sed '/^$/d')
