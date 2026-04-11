@@ -5,12 +5,12 @@ on:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-
 jobs:
   release:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -39,7 +39,7 @@ jobs:
       run: dotnet test --no-build --configuration Release --verbosity normal
 
     - name: Publish LSP server
-      run: dotnet publish Server/SdkLspServer.csproj -c Release -o vscode-extension/server
+      run: dotnet publish Server/SdkLspServer.csproj --no-build --no-restore -c Release -o vscode-extension/server
 
     - name: Update extension version
       working-directory: vscode-extension
@@ -47,7 +47,7 @@ jobs:
 
     - name: Install npm dependencies
       working-directory: vscode-extension
-      run: npm install
+      run: npm ci
 
     - name: Compile TypeScript
       working-directory: vscode-extension
@@ -55,7 +55,7 @@ jobs:
 
     - name: Package VSIX
       working-directory: vscode-extension
-      run: npx @vscode/vsce package
+      run: npx --no-install @vscode/vsce package
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
