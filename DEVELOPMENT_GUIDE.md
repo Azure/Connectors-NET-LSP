@@ -183,7 +183,7 @@ private static async Task Main(string[] args)
 ### "LSP Server not running" error
 
 **Cause**: Extension not started  
-**Fix**: Start the VS Code extension first (LogicAppsUX, F5)
+**Fix**: Start the VS Code extension first (F5)
 
 ### Multiple processes in picker
 
