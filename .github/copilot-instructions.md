@@ -297,6 +297,52 @@ Within each group: public → internal → private
 | Magic strings (e.g., `"type"`, `"object"`) | Named constants (e.g., `SchemaPropertyNames.Type`) |
 | `[0]` or `.First()` | `.Single()` (or `.SingleOrDefault()` + explicit validation) |
 
+## Pre-Commit Review Checklist
+
+Before committing, verify:
+
+1. **Coding standards** — Grep changed files for:
+   - Single-letter lambda parameters (`p =>`, `v =>`, `c =>`) → rename to descriptive names
+   - `StringComparison` missing on `.StartsWith()`, `.EndsWith()`, `.Contains()`, `.IndexOf()`, `.Replace()`
+   - Unnamed boolean arguments → add named parameter
+   - `ConfigureAwait(false)` → `ConfigureAwait(continueOnCapturedContext: false)`
+
+2. **Comment staleness** — For every behavior change, search for comments/docs describing the old behavior. Update all of them, not just the code. Common locations:
+   - XML `<summary>` docs on the changed method
+   - Inline comments near the changed code
+   - Startup/initialization comments referencing the feature
+   - README sections describing the feature
+
+3. **Edge cases** — For every new parameter, function, or code path, ask:
+   - What if the input is null/empty?
+   - What if the input is the wrong type (e.g., DLL path where nupkg expected)?
+   - What if a dependency is missing (e.g., no `project.assets.json`)?
+   - What if a collection has 0 items? 1 item? Many items?
+
+4. **Design completeness** — Before pushing a fix, review the full call chain:
+   - Does the caller handle all return values correctly?
+   - Are property/parameter names accurate for all callers (not just the original use case)?
+   - Will the next reviewer find a cascading issue from this change?
+
+5. **Platform edge cases** — Consider all target environments:
+   - Windows: drive-letter roots (`C:\`), backslash paths, case-insensitive filesystem
+   - macOS/Linux: no `grep -P`, case-sensitive filesystem, forward slashes, BSD vs GNU tools
+   - CLI args: empty values (`--flag=`), missing values (`--flag --next-flag`), multiple values
+   - NuGet: multi-TFM projects, multiple package folders, case variations in package keys, missing `project.assets.json`
+   - Large workspaces: skip `node_modules`, `.git`, `bin`, `obj` during filesystem scans
+
+## Design-First Approach
+
+Before implementing a new feature or significant change:
+
+1. **Draft the API surface** — Write function signatures, parameter types, return types, setting names, and CLI arguments in a scratch comment or directly in the code as stubs
+2. **Review naming** — Are names accurate for all callers? Will they be misleading when the feature evolves?
+3. **Enumerate edge cases** — Walk through the platform checklist above for each new parameter
+4. **Consider the full call chain** — Trace from CLI/extension entry point through to the final consumer. Identify null paths, empty collections, and type mismatches
+5. **Then implement** — Write the body only after the design is settled
+
+This prevents cascading review cycles where each fix introduces new naming, edge case, or consistency issues.
+
 ## Testing
 
 ```csharp
