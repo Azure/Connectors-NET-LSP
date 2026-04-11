@@ -280,12 +280,22 @@ async function resolveSdkPath(
     // 1. Explicit setting — prefer new sdkPath, fall back to deprecated sdkNupkgPath
     const configured = config.get<string>("sdkPath") || config.get<string>("sdkNupkgPath");
     if (configured && await fileExists(configured)) {
-        // Validate it's a regular file, not a directory
+        // Validate it's a regular file with a supported extension
         try {
             const configuredStat = await fs.promises.stat(configured);
             if (configuredStat.isFile()) {
-                const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
-                return { paths: [configured], type, source: "setting" };
+                const configuredExtension = path.extname(configured).toLowerCase();
+                if (configuredExtension === ".dll") {
+                    return { paths: [configured], type: "assembly", source: "setting" };
+                }
+
+                if (configuredExtension === ".nupkg") {
+                    return { paths: [configured], type: "nupkg", source: "setting" };
+                }
+
+                outputChannel?.appendLine(
+                    `Ignoring configured sdkPath '${configured}' because only '.dll' and '.nupkg' files are supported.`
+                );
             }
         } catch {
             // stat failed — skip this setting
@@ -460,7 +470,7 @@ async function findNewestNupkgInDir(dirPath: string): Promise<string | undefined
         }
 
         const entries = await fs.promises.readdir(dirPath);
-        const nupkgFiles = entries.filter((f) => f.endsWith(".nupkg"));
+        const nupkgFiles = entries.filter((f) => f.toLowerCase().endsWith(".nupkg"));
         if (nupkgFiles.length === 0) {
             return undefined;
         }

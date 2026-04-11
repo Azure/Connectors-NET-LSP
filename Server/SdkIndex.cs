@@ -139,12 +139,30 @@ public sealed class SdkIndex
             return null;
         }
 
-        // Normalize to absolute paths so RootDirectory is always usable
-        List<string> validPaths = assemblyPaths
-            .Where(assemblyPath => !string.IsNullOrWhiteSpace(assemblyPath))
-            .Select(assemblyPath => Path.GetFullPath(assemblyPath))
-            .Where(fullPath => File.Exists(fullPath))
-            .ToList();
+        // Normalize to absolute paths so RootDirectory is always usable.
+        // Per-path exception handling ensures invalid characters don't crash the server.
+        var validPaths = new List<string>();
+        foreach (string assemblyPath in assemblyPaths)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                string fullPath = Path.GetFullPath(assemblyPath);
+                if (File.Exists(fullPath))
+                {
+                    validPaths.Add(fullPath);
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                continue;
+            }
+        }
+
         if (validPaths.Count == 0)
         {
             return null;
