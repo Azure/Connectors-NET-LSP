@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 namespace SdkLspServer;
 
 /// <summary>
-/// Represents an indexed SDK extracted from a NuGet package. It holds lists of
-/// assemblies and type names discovered in the package. The index is loaded
-/// eagerly on startup to avoid reflection during request handling.
+/// Represents an indexed SDK loaded from a NuGet package or assembly DLLs. It
+/// holds lists of assemblies and type names discovered from the SDK assemblies.
+/// The index is loaded eagerly on startup to avoid reflection during request handling.
 /// </summary>
 public sealed class SdkIndex
 {
-    /// <summary>Gets the source .nupkg path used to create this index.</summary>
-    public string SourceNupkgPath { get; }
+    /// <summary>Gets a description of the source used to create this index (nupkg path, DLL path, or a count of assemblies).</summary>
+    public string Source { get; }
 
-    /// <summary>Gets the root directory where the nupkg contents were extracted.</summary>
-    public string ExtractRoot { get; }
+    /// <summary>Gets the root directory containing the indexed assemblies (extraction directory for nupkg, containing directory for DLLs).</summary>
+    public string RootDirectory { get; }
 
     /// <summary>Gets list of discovered assembly DLL paths.</summary>
     public ImmutableArray<string> AssemblyPaths { get; }
@@ -37,15 +37,15 @@ public sealed class SdkIndex
     public string Summary => $"{AssemblyPaths.Length} assemblies, {TypeNames.Length} types";
 
     private SdkIndex(
-        string nupkg,
+        string source,
         string root,
         IEnumerable<string> assemblies,
         IEnumerable<string> types,
         IEnumerable<SdkConstant> connectorNames,
         IDictionary<string, ImmutableArray<SdkConstant>> triggerOps)
     {
-        SourceNupkgPath = nupkg;
-        ExtractRoot = root;
+        Source = source;
+        RootDirectory = root;
         AssemblyPaths = assemblies.ToImmutableArray();
         TypeNames = types.ToImmutableArray();
         ConnectorNameConstants = connectorNames.ToImmutableArray();
@@ -117,32 +117,152 @@ public sealed class SdkIndex
         {
             List<string> assemblies = await NupkgLoader.ExtractAndFindAssembliesAsync(nupkgPath, extractRoot);
 
-            // Load metadata and collect type names and constants without executing code
-            MetadataReader.DiscoveryResult discovery = MetadataReader.DiscoverTypes(assemblies);
-            if (discovery.Failures.Count > 0)
-            {
-                await Console.Error.WriteLineAsync("[SdkLspServer] Failed to read some assemblies:\n  " +
-                    string.Join("\n  ", discovery.Failures.Select(f => $"{f.Path}: {f.Error}")));
-            }
-
-            await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
-                $"{discovery.ConnectorNames.Count} connector names, " +
-                $"{discovery.TriggerOperations.Values.Sum(v => v.Length)} trigger operations across " +
-                $"{discovery.TriggerOperations.Count} connectors");
-
-            return new SdkIndex(
-                nupkgPath,
-                extractRoot,
-                assemblies,
-                discovery.Types,
-                discovery.ConnectorNames,
-                discovery.TriggerOperations);
+            return await BuildIndexAsync(nupkgPath, extractRoot, assemblies);
         }
         catch (Exception ex)
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] Indexing failed: {ex}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Attempts to create an index from one or more assembly DLL paths on disk
+    /// (e.g., from the NuGet cache). No nupkg extraction is needed — the DLLs
+    /// are read directly via MetadataLoadContext.
+    /// </summary>
+    /// <param name="assemblyPaths">One or more paths to SDK assembly DLLs.</param>
+    public static async Task<SdkIndex?> TryCreateFromAssembliesAsync(params string[] assemblyPaths)
+    {
+        if (assemblyPaths is null || assemblyPaths.Length == 0)
+        {
+            return null;
+        }
+
+        // Normalize to absolute paths so RootDirectory is always usable.
+        // Per-path exception handling ensures invalid characters don't crash the server.
+        var validPaths = new List<string>();
+        foreach (string assemblyPath in assemblyPaths)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                string fullPath = Path.GetFullPath(assemblyPath);
+                if (File.Exists(fullPath))
+                {
+                    validPaths.Add(fullPath);
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                continue;
+            }
+        }
+
+        if (validPaths.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            string sourceDescription = validPaths.Count == 1
+                ? validPaths[0]
+                : $"{validPaths.Count} assemblies";
+
+            // Use the common parent directory when assemblies span multiple directories,
+            // or the containing directory when there is only one.
+            string rootDirectory = validPaths.Count == 1
+                ? Path.GetDirectoryName(validPaths[0]) ?? string.Empty
+                : FindCommonParentDirectory(validPaths);
+
+            return await BuildIndexAsync(sourceDescription, rootDirectory, validPaths);
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"[SdkLspServer] Assembly indexing failed: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Finds the deepest common parent directory for a list of file paths.
+    /// </summary>
+    private static string FindCommonParentDirectory(List<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        string[] segments = Path.GetDirectoryName(paths[0])?.Split(Path.DirectorySeparatorChar) ?? [];
+        foreach (string filePath in paths.Skip(1))
+        {
+            string[] otherSegments = Path.GetDirectoryName(filePath)?.Split(Path.DirectorySeparatorChar) ?? [];
+            int commonLength = Math.Min(segments.Length, otherSegments.Length);
+            int matchCount = 0;
+            for (int i = 0; i < commonLength; i++)
+            {
+                if (!string.Equals(segments[i], otherSegments[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                matchCount++;
+            }
+
+            segments = segments[..matchCount];
+        }
+
+        string result = segments.Length > 0 ? string.Join(Path.DirectorySeparatorChar, segments) : string.Empty;
+
+        // Ensure drive-only roots are valid paths (e.g., "C:" -> "C:\\")
+        if (result.Length == 2 && result[1] == ':')
+        {
+            result += Path.DirectorySeparatorChar;
+        }
+
+        // Handle Unix root: empty result from splitting "/" paths means root is "/"
+        if (string.IsNullOrEmpty(result) && paths.All(filePath => Path.IsPathRooted(filePath)))
+        {
+            result = Path.GetPathRoot(paths[0]) ?? string.Empty;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Shared indexing logic used by both nupkg and direct-assembly creation paths.
+    /// </summary>
+    /// <param name="sourceDescription">Human-readable description of the SDK source (nupkg path, DLL path, or assembly count).</param>
+    /// <param name="root">Root directory containing the indexed assemblies.</param>
+    /// <param name="assemblies">Paths to the assembly DLLs to index.</param>
+    private static async Task<SdkIndex?> BuildIndexAsync(string sourceDescription, string root, List<string> assemblies)
+    {
+        // Load metadata and collect type names and constants without executing code
+        MetadataReader.DiscoveryResult discovery = MetadataReader.DiscoverTypes(assemblies);
+        if (discovery.Failures.Count > 0)
+        {
+            await Console.Error.WriteLineAsync("[SdkLspServer] Failed to read some assemblies:\n  " +
+                string.Join("\n  ", discovery.Failures.Select(failure => $"{failure.Path}: {failure.Error}")));
+        }
+
+        await Console.Error.WriteLineAsync($"[SdkLspServer] SDK index: {discovery.Types.Count} types, " +
+            $"{discovery.ConnectorNames.Count} connector names, " +
+            $"{discovery.TriggerOperations.Values.Sum(operations => operations.Length)} trigger operations across " +
+            $"{discovery.TriggerOperations.Count} connectors");
+
+        return new SdkIndex(
+            sourceDescription,
+            root,
+            assemblies,
+            discovery.Types,
+            discovery.ConnectorNames,
+            discovery.TriggerOperations);
     }
 
     /// <summary>

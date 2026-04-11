@@ -47,6 +47,49 @@ else
   echo "Install with: dotnet tool install -g dotnet-format"
 fi
 
+echo "[pre-commit] Checking staged C# files for common style violations..."
+STAGED_CS=$(git diff --cached --name-only --diff-filter=ACMR -- '*.cs')
+STYLE_ERRORS=0
+
+if [[ -n "$STAGED_CS" ]]; then
+  # Single-letter lambda parameters (allow only 'ex' for exceptions)
+  # Uses awk on the staged snapshot (git show :file) for accuracy
+  LAMBDA_HITS=""
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    FILE_HITS=$(git show :"$file" 2>/dev/null | awk -v fname="$file" '/(^|[^[:alnum:]_])[a-z][[:space:]]*=>/ && !/(^|[^[:alnum:]_])ex[[:space:]]*=>/ { print fname ":" NR ":" $0 }' 2>/dev/null || true)
+    [[ -n "$FILE_HITS" ]] && LAMBDA_HITS+="$FILE_HITS"$'\n'
+  done <<< "$STAGED_CS"
+  LAMBDA_HITS=$(echo "$LAMBDA_HITS" | sed '/^$/d')
+  if [[ -n "$LAMBDA_HITS" ]]; then
+    echo "[pre-commit] ⚠️  Single-letter lambda parameters found (use descriptive names):"
+    echo "$LAMBDA_HITS" | head -10
+    STYLE_ERRORS=1
+  fi
+
+  # ConfigureAwait(false) without named parameter
+  CA_HITS=""
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    FILE_HITS=$(git show :"$file" 2>/dev/null | awk -v fname="$file" '/ConfigureAwait\(false\)/ { print fname ":" NR ":" $0 }' 2>/dev/null || true)
+    [[ -n "$FILE_HITS" ]] && CA_HITS+="$FILE_HITS"$'\n'
+  done <<< "$STAGED_CS"
+  CA_HITS=$(echo "$CA_HITS" | sed '/^$/d')
+  if [[ -n "$CA_HITS" ]]; then
+    echo "[pre-commit] ⚠️  ConfigureAwait(false) without named parameter:"
+    echo "$CA_HITS" | head -10
+    STYLE_ERRORS=1
+  fi
+fi
+
+if [[ "$STYLE_ERRORS" -eq 1 ]]; then
+  echo "[pre-commit] ⚠️  Style warnings found (not blocking). Fix before PR review."
+else
+  if [[ -n "$STAGED_CS" ]]; then
+    echo "[pre-commit] ✅ No common style violations in staged files."
+  fi
+fi
+
 echo "[pre-commit] Building solution with analyzers..."
 # Build without restoring (faster), fail on errors; warnings are shown but not fatal here
 if dotnet build --no-restore >/dev/null; then
