@@ -38,12 +38,12 @@ jobs:
     - name: Test
       run: dotnet test --no-build --no-restore --configuration Release --verbosity normal
 
-    - name: Publish LSP server
-      run: dotnet publish Server/SdkLspServer.csproj --no-build --no-restore -c Release -o vscode-extension/server
-
     - name: Update extension version
       working-directory: vscode-extension
       run: npm version "${{ steps.version.outputs.VERSION }}" --no-git-tag-version
+
+    - name: Publish LSP server
+      run: dotnet publish Server/SdkLspServer.csproj --no-build --no-restore -c Release -o vscode-extension/server
 
     - name: Install npm dependencies
       working-directory: vscode-extension
