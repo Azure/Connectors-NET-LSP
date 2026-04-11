@@ -139,7 +139,11 @@ public sealed class SdkIndex
             return null;
         }
 
-        List<string> validPaths = assemblyPaths.Where(File.Exists).ToList();
+        // Normalize to absolute paths so RootDirectory is always usable
+        List<string> validPaths = assemblyPaths
+            .Select(assemblyPath => Path.GetFullPath(assemblyPath))
+            .Where(fullPath => File.Exists(fullPath))
+            .ToList();
         if (validPaths.Count == 0)
         {
             return null;

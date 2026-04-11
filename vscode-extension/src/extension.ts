@@ -280,8 +280,16 @@ async function resolveSdkPath(
     // 1. Explicit setting — prefer new sdkPath, fall back to deprecated sdkNupkgPath
     const configured = config.get<string>("sdkPath") || config.get<string>("sdkNupkgPath");
     if (configured && await fileExists(configured)) {
-        const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
-        return { paths: [configured], type, source: "setting" };
+        // Validate it's a regular file, not a directory
+        try {
+            const configuredStat = await fs.promises.stat(configured);
+            if (configuredStat.isFile()) {
+                const type = path.extname(configured).toLowerCase() === ".dll" ? "assembly" as const : "nupkg" as const;
+                return { paths: [configured], type, source: "setting" };
+            }
+        } catch {
+            // stat failed — skip this setting
+        }
     }
 
     // 2. Workspace project NuGet references — parse project.assets.json
