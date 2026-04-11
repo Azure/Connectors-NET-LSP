@@ -141,6 +141,7 @@ public sealed class SdkIndex
 
         // Normalize to absolute paths so RootDirectory is always usable
         List<string> validPaths = assemblyPaths
+            .Where(assemblyPath => !string.IsNullOrWhiteSpace(assemblyPath))
             .Select(assemblyPath => Path.GetFullPath(assemblyPath))
             .Where(fullPath => File.Exists(fullPath))
             .ToList();

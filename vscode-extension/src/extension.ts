@@ -338,7 +338,7 @@ async function findSdkFromProjectAssets(
     // Find .csproj files in the folder. If maxDepth > 0, recursively check subdirectories up to maxDepth levels deep.
     try {
         const entries = await fs.promises.readdir(folderPath);
-        const csprojFiles = entries.filter((f) => f.endsWith(".csproj"));
+        const csprojFiles = entries.filter((f) => f.toLowerCase().endsWith(".csproj"));
 
         for (const csproj of csprojFiles) {
             const projectDir = folderPath;
