@@ -208,6 +208,12 @@ public sealed class SdkIndex
             result += Path.DirectorySeparatorChar;
         }
 
+        // Handle Unix root: empty result from splitting "/" paths means root is "/"
+        if (string.IsNullOrEmpty(result) && paths.All(filePath => Path.IsPathRooted(filePath)))
+        {
+            result = Path.GetPathRoot(paths[0]) ?? string.Empty;
+        }
+
         return result;
     }
 

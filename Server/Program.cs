@@ -333,7 +333,13 @@ internal static class Program
 
             if (args[i].StartsWith("--sdk=", StringComparison.Ordinal))
             {
-                return new SdkPathResult { NupkgPath = args[i]["--sdk=".Length..], Source = "arg" };
+                string nupkgValue = args[i]["--sdk=".Length..];
+                if (string.IsNullOrEmpty(nupkgValue))
+                {
+                    return new SdkPathResult { Source = "arg-missing" };
+                }
+
+                return new SdkPathResult { NupkgPath = nupkgValue, Source = "arg" };
             }
 
             // --sdk-assembly /path/to/Assembly1.dll /path/to/Assembly2.dll ...
