@@ -2,3 +2,7 @@
 out/**/*.js.map
 src/
 tsconfig.json
+node_modules/**/CHANGELOG.md
+node_modules/**/README.md
+node_modules/**/*.d.ts.map
+**/*.ts

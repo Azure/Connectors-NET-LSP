@@ -10,7 +10,7 @@
     "url": "git+https://github.com/Azure/Connectors-NET-LSP.git"
   },
   "engines": {
-    "vscode": "^1.100.0",
+    "vscode": "^1.110.0",
     "node": ">=20"
   },
   "categories": [
