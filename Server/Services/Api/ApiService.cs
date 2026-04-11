@@ -240,7 +240,8 @@ public class ApiService
 
                     await AuthenticateClientAsync(client);
 
-                    using HttpResponseMessage response = await client.PostAsJsonAsync(url, payload, jsonOptions, ct);
+                    using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+                    using HttpResponseMessage response = await client.PostAsync(url, content, ct);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -288,7 +289,8 @@ public class ApiService
 
                     await AuthenticateClientAsync(client);
 
-                    using HttpResponseMessage response = await client.PostAsJsonAsync(url, payload, jsonOptions, ct);
+                    using var content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+                    using HttpResponseMessage response = await client.PostAsync(url, content, ct);
                     string responseBody = await response.Content.ReadAsStringAsync(ct);
 
                     await Console.Error.WriteLineAsync($"[ApiService] POST status: {(int)response.StatusCode} {response.StatusCode}");
