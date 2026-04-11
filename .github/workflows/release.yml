@@ -36,7 +36,7 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Test
-      run: dotnet test --no-build --configuration Release --verbosity normal
+      run: dotnet test --no-build --no-restore --configuration Release --verbosity normal
 
     - name: Publish LSP server
       run: dotnet publish Server/SdkLspServer.csproj --no-build --no-restore -c Release -o vscode-extension/server
