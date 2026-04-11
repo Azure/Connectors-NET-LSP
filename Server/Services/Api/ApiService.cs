@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 
@@ -224,7 +226,8 @@ public class ApiService
     /// <returns>The response content as a string, or null if the request fails.</returns>
     public async Task<string?> PostJsonAsync(string url, object payload, CancellationToken cancellationToken = default)
     {
-        string payloadHash = JsonSerializer.Serialize(payload, jsonOptions).GetHashCode().ToString();
+        byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, jsonOptions);
+        string payloadHash = ComputeHash(payloadBytes);
         string cacheKey = $"POST:{url}:{payloadHash}";
 
         return await cache.GetOrSetAsync<string?>(
@@ -237,7 +240,9 @@ public class ApiService
 
                     await AuthenticateClientAsync(client);
 
-                    using HttpResponseMessage response = await client.PostAsJsonAsync(url, payload, jsonOptions, ct);
+                    using var content = new ByteArrayContent(payloadBytes);
+                    content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+                    using HttpResponseMessage response = await client.PostAsync(url, content, ct);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -271,7 +276,8 @@ public class ApiService
     /// <returns>The deserialized response object, or default if the request fails.</returns>
     public async Task<TResponse?> PostJsonAsync<TResponse>(string url, object payload, CancellationToken cancellationToken = default)
     {
-        string payloadHash = JsonSerializer.Serialize(payload, jsonOptions).GetHashCode().ToString();
+        byte[] payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, jsonOptions);
+        string payloadHash = ComputeHash(payloadBytes);
         string cacheKey = $"POST_JSON:{typeof(TResponse).FullName}:{url}:{payloadHash}";
 
         return await cache.GetOrSetAsync<TResponse?>(
@@ -284,7 +290,9 @@ public class ApiService
 
                     await AuthenticateClientAsync(client);
 
-                    using HttpResponseMessage response = await client.PostAsJsonAsync(url, payload, jsonOptions, ct);
+                    using var content = new ByteArrayContent(payloadBytes);
+                    content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+                    using HttpResponseMessage response = await client.PostAsync(url, content, ct);
                     string responseBody = await response.Content.ReadAsStringAsync(ct);
 
                     await Console.Error.WriteLineAsync($"[ApiService] POST status: {(int)response.StatusCode} {response.StatusCode}");
@@ -309,5 +317,15 @@ public class ApiService
                 .SetFailSafe(true, TimeSpan.FromHours(1))
                 .SetFactoryTimeouts(TimeSpan.FromSeconds(30), keepTimedOutFactoryResult: false),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Computes a deterministic SHA-256 hash of the input bytes for use as a cache key component.
+    /// </summary>
+    /// <param name="input">The bytes to hash.</param>
+    private static string ComputeHash(byte[] input)
+    {
+        byte[] hashBytes = SHA256.HashData(input);
+        return Convert.ToHexString(hashBytes);
     }
 }

@@ -2577,7 +2577,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
             return null;
         }
 
-        return $"{apiConfiguration.BaseUrl}/subscriptions/{apiConfiguration.SubscriptionId}/resourceGroups/{apiConfiguration.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfiguration.ApiVersion}";
+        return $"{apiConfiguration.BaseUrl}/subscriptions/{apiConfiguration.SubscriptionId}/resourceGroups/{apiConfiguration.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfiguration.EffectiveApiVersion}";
     }
 
     /// <summary>

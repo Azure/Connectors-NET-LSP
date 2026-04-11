@@ -71,7 +71,7 @@ public class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
             JsonElement? schema = await schemaFetcher.FetchSchemaAsync(
                 args.ConnectorName,
                 args.OperationId,
-                CancellationToken.None);
+                cancellationToken);
 
             if (schema == null)
             {
