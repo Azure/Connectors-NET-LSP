@@ -85,7 +85,7 @@ internal static class DynamicValuesHelper
             return (null, false);
         }
 
-        string armUrl = $"{apiConfig.BaseUrl}/subscriptions/{apiConfig.SubscriptionId}/resourceGroups/{apiConfig.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfig.ApiVersion}";
+        string armUrl = $"{apiConfig.BaseUrl}/subscriptions/{apiConfig.SubscriptionId}/resourceGroups/{apiConfig.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfig.EffectiveApiVersion}";
         return (armUrl, false);
     }
 

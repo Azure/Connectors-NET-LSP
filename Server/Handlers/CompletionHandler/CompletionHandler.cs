@@ -1846,7 +1846,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
 
         ApiServiceConfig apiConfiguration = apiService.Config;
 
-        return $"{apiConfiguration.BaseUrl}/subscriptions/{apiConfiguration.SubscriptionId}/resourceGroups/{apiConfiguration.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfiguration.ApiVersion}";
+        return $"{apiConfiguration.BaseUrl}/subscriptions/{apiConfiguration.SubscriptionId}/resourceGroups/{apiConfiguration.ResourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={apiConfiguration.EffectiveApiVersion}";
     }
 
     private static HoverHandlerTypes.DynamicInvokePayload? BuildDynamicApiPayload(string connectorName, string operationName)

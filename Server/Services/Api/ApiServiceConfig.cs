@@ -12,6 +12,8 @@ namespace SdkLspServer.Services.Api;
 /// </remarks>
 public class ApiServiceConfig
 {
+    public const string DefaultApiVersion = "2018-07-01-preview";
+
     [JsonPropertyName("baseUrl")]
     public string BaseUrl { get; set; } = string.Empty;
 
@@ -25,7 +27,14 @@ public class ApiServiceConfig
     public string BearerToken { get; set; } = string.Empty;
 
     [JsonPropertyName("apiVersion")]
-    public string ApiVersion { get; set; } = "2018-07-01-preview";
+    public string ApiVersion { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Returns the API version to use: the configured value, or the default if not set.
+    /// </summary>
+    [JsonIgnore]
+    public string EffectiveApiVersion =>
+        string.IsNullOrEmpty(ApiVersion) ? DefaultApiVersion : ApiVersion;
 
     public void UpdateFrom(ApiServiceConfig? updateConfig)
     {
