@@ -89,11 +89,31 @@ The `vscode-extension/` directory contains a purpose-built VS Code extension tha
 dotnet publish Server/SdkLspServer.csproj -c Release -o vscode-extension/server
 
 cd vscode-extension
-npm install
-npx @vscode/vsce package
+npm ci
+npx --no-install @vscode/vsce package
 ```
 
 The extension expects the server at `<extension-path>/server/SdkLspServer.dll`. If the `server/` directory is not populated, users must set `connectorSdk.lspServerPath` in VS Code settings.
+
+### Releasing a New Version
+
+Releases are automated via `.github/workflows/release.yml`. Pushing a `v*` tag triggers the workflow which builds, tests, packages the VSIX, and creates a GitHub Release with the `.vsix` attached.
+
+```bash
+# 1. Update CHANGELOG.md with the new version entry
+# 2. Update vscode-extension/package.json version to match
+# 3. Create PR, get it merged
+# 4. Tag and release:
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+**Known gotchas:**
+
+- **Version already matches:** `npm version` fails with "Version not changed" if `package.json` already has the target version. The workflow uses `--allow-same-version` to handle this, so it's safe to set the version in the PR and tag the same value.
+- **Dirty working tree:** `npm version` fails on a dirty git tree. The workflow runs the version bump *before* `dotnet publish` (which creates files in `vscode-extension/server/`) to avoid this.
+- **Engine version alignment:** `vsce package` fails if `@types/vscode` version exceeds `engines.vscode` in `package.json`. Keep them aligned when upgrading either.
+- **Verifying installed build:** The LSP server assembly version defaults to `1.0.0.0`. To confirm which build is running, check the DLL path in the extension output — VSIX installs load from `~/.vscode/extensions/microsoft.connector-sdk-intellisense-<version>/server/`.
 
 The extension automatically:
 
