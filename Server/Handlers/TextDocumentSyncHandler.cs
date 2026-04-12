@@ -104,8 +104,9 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
 
     public Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
-        // Clear diagnostics when a document is closed
+        // Clear diagnostics and release buffer memory when a document is closed
         this.diagnosticPublisher.ClearDiagnostics(request.TextDocument.Uri);
+        this.bufferManager.RemoveBuffer(request.TextDocument.Uri.ToString());
         return Unit.Task;
     }
 #pragma warning restore VSTHRD200

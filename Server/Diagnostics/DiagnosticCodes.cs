@@ -19,8 +19,7 @@ internal static class DiagnosticCodes
     // CSDK001–CSDK099: Attribute validation
     // ---------------------------------------------------------------
 
-    /// <summary>Info-level diagnostic when a C# file contains no SDK using directives.</summary>
-    public const string NoSdkUsageDetected = "CSDK001";
+    // (reserved for future validators)
 
     // ---------------------------------------------------------------
     // CSDK100–CSDK199: Connection configuration
@@ -44,5 +43,6 @@ internal static class DiagnosticCodes
     // CSDK400–CSDK499: SDK usage patterns
     // ---------------------------------------------------------------
 
-    // (reserved for future validators)
+    /// <summary>Info-level diagnostic when a C# file contains no reference to the SDK namespace.</summary>
+    public const string NoSdkUsageDetected = "CSDK400";
 }

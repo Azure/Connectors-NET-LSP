@@ -8,9 +8,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 namespace SdkLspServer.Diagnostics.Validators;
 
 /// <summary>
-/// Emits an informational diagnostic when a C# file does not contain any
-/// <c>using Microsoft.Azure.Connectors.Sdk</c> directives, indicating that
-/// the file likely does not use the Connectors SDK.
+/// Emits an informational diagnostic when a C# file does not reference the
+/// <c>Microsoft.Azure.Connectors.Sdk</c> namespace anywhere in its text,
+/// indicating that the file likely does not use the Connectors SDK.
+/// This is a lightweight heuristic check, not a precise using-directive analysis.
 /// </summary>
 internal sealed class SdkUsageValidator : IDiagnosticValidator
 {
@@ -30,7 +31,7 @@ internal sealed class SdkUsageValidator : IDiagnosticValidator
             return Task.FromResult<IReadOnlyList<Diagnostic>>(diagnostics);
         }
 
-        // Check whether the document contains a using directive for the SDK namespace
+        // Check whether the document references the SDK namespace anywhere
         bool hasSdkUsing = documentText.Contains(SdkUsageValidator.SdkNamespace, StringComparison.Ordinal);
 
         if (!hasSdkUsing)
@@ -43,7 +44,7 @@ internal sealed class SdkUsageValidator : IDiagnosticValidator
                 Severity = DiagnosticSeverity.Information,
                 Code = DiagnosticCodes.NoSdkUsageDetected,
                 Source = DiagnosticCodes.Source,
-                Message = "No SDK usage detected. Add 'using Microsoft.Azure.Connectors.Sdk;' to use the Connectors SDK.",
+                Message = "No Connectors SDK namespace reference found in this file.",
             });
         }
 
