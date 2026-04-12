@@ -215,7 +215,7 @@ internal sealed class DiagnosticPublisher : IDisposable
         }
         catch (OperationCanceledException)
         {
-            // Debounce was superseded or document was closed — expected.
+            // NOTE(daviburg): Debounce was superseded or document was closed — expected.
         }
         catch (Exception ex)
         {
