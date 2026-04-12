@@ -112,7 +112,7 @@ internal static class Program
                          {
                              apiConfig.UpdateFrom(updateConfig);
                          }
-                         catch (Exception ex)
+                         catch (Exception ex) when (!ex.IsFatal())
                          {
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Failed to update apiConfig: {ex.Message}");
                          }
@@ -127,7 +127,7 @@ internal static class Program
                              int count = connectionsService.GetConnectionCount();
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ✅ Connections updated via notification: {count} connection(s)");
                          }
-                         catch (Exception ex)
+                         catch (Exception ex) when (!ex.IsFatal())
                          {
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Failed to update connections: {ex.Message}");
                          }
@@ -191,7 +191,7 @@ internal static class Program
                                 await Console.Error.WriteLineAsync("[SdkLspServer] ⚠️  No telemetry config provided in initializationOptions");
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!ex.IsFatal())
                         {
                             telemetryService?.TrackException(ex, new Dictionary<string, string>
                             {
@@ -245,7 +245,7 @@ internal static class Program
 
             await Console.Error.WriteLineAsync("[SdkLspServer] Server shutdown complete");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Fatal error: {ex.Message}");
             await Console.Error.WriteLineAsync($"[SdkLspServer] Stack trace: {ex.StackTrace}");

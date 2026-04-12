@@ -88,7 +88,7 @@ internal static class DynamicSchemaCache
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[DynamicSchemaCache] Error scanning {Path.GetFileName(assemblyPath)}: {ex.Message}");
         }

@@ -45,7 +45,7 @@ internal static partial class SdkDynamicOperationsDiscovery
                 CSharpCompilation compilation = CreateCompilationWithSdk(sdkIndex);
                 DiscoverFromCompilation(compilation, cachedOperations);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] ❌ Error during discovery: {ex.Message}");
             }
@@ -76,7 +76,7 @@ internal static partial class SdkDynamicOperationsDiscovery
                     seenPaths.Add(assemblyPath);
                     Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] Added SDK reference: {Path.GetFileName(assemblyPath)}");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] Failed to add reference {Path.GetFileName(assemblyPath)}: {ex.Message}");
                 }
@@ -149,7 +149,7 @@ internal static partial class SdkDynamicOperationsDiscovery
                     });
                     Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] Created decompiler for {Path.GetFileName(assemblyPath)}");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] Failed to create decompiler: {ex.Message}");
                 }
@@ -379,7 +379,7 @@ internal static partial class SdkDynamicOperationsDiscovery
 
             return metadata;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] Failed to decompile {methodSymbol.Name}: {ex.Message}");
             return null;
@@ -556,7 +556,7 @@ internal static partial class SdkDynamicOperationsDiscovery
                     Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] ✅ Loaded {cachedConfig.Count} operations from config file");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] ❌ Failed to load config: {ex.Message}");
                 Console.Error.WriteLine($"[SdkDynamicOperationsDiscovery] StackTrace: {ex.StackTrace}");

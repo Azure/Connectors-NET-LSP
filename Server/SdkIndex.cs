@@ -119,7 +119,7 @@ public sealed class SdkIndex
 
             return await BuildIndexAsync(nupkgPath, extractRoot, assemblies);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] Indexing failed: {ex}");
             return null;
@@ -157,7 +157,7 @@ public sealed class SdkIndex
                     validPaths.Add(fullPath);
                 }
             }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 continue;
             }
@@ -182,7 +182,7 @@ public sealed class SdkIndex
 
             return await BuildIndexAsync(sourceDescription, rootDirectory, validPaths);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] Assembly indexing failed: {ex}");
             return null;

@@ -61,7 +61,7 @@ public class TelemetryService : ITelemetryService, IDisposable
             isEnabled = true;
             Console.Error.WriteLine($"[Telemetry] Initialized successfully in PRODUCTION mode (SessionId: {sessionId})");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to initialize: {ex.Message}");
             isEnabled = false;
@@ -96,7 +96,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client?.TrackEvent(eventName, properties);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to track event '{eventName}': {ex.Message}");
         }
@@ -138,7 +138,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client.TrackMetric(metric);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to track metric '{metricName}': {ex.Message}");
         }
@@ -171,7 +171,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client?.TrackException(exception, properties);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to track exception: {ex.Message}");
         }
@@ -204,7 +204,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client?.TrackTrace(message, severity, properties);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to track trace: {ex.Message}");
         }
@@ -239,7 +239,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client?.TrackDependency(dependencyType, target, name, startTime, duration, success);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to track dependency: {ex.Message}");
         }
@@ -266,7 +266,7 @@ public class TelemetryService : ITelemetryService, IDisposable
                 client?.Flush();
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[Telemetry] Failed to flush: {ex.Message}");
         }

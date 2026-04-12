@@ -316,7 +316,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
 
             return new CompletionList(items);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             telemetry.TrackException(ex, new Dictionary<string, string>
             {
@@ -1200,7 +1200,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
 
             return items;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error in HandleConnectionCompletionAsync: {ex.Message}");
             return null;
@@ -1343,7 +1343,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 semanticModel,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error in HandleDynamicValuesCompletionAsync: {ex.Message}");
             return null;
@@ -1475,7 +1475,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 semanticModel,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error in HandleArgumentPositionDynamicValuesAsync: {ex.Message}");
             return null;
@@ -1626,7 +1626,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 Preselect = false,
             }).ToList();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error fetching dynamic values: {ex.Message}");
         }
@@ -1887,7 +1887,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 $"\"{form.Id}\"",
                 form.Title ?? "Untitled Form"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error calling dynamic API: {ex.Message}");
             return null;
@@ -1930,7 +1930,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 $"\"{item.Name}\"",
                 item.DisplayName ?? item.Name ?? "Unknown"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CompletionHandler] Error calling DirectClient API for '{connectorName}': {ex.Message}");
             return null;

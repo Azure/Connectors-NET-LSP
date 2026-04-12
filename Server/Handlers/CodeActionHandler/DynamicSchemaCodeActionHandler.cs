@@ -102,7 +102,7 @@ public class DynamicSchemaCodeActionHandler(
         {
             return new CommandOrCodeActionContainer();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[CodeAction] Error: {ex.Message}");
             telemetry.TrackException(ex, new Dictionary<string, string>
