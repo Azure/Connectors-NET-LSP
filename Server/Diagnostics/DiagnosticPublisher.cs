@@ -103,7 +103,7 @@ internal sealed class DiagnosticPublisher : IDisposable
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 await Console.Error.WriteLineAsync(
                     $"[DiagnosticPublisher] Validator '{validator.GetType().Name}' threw: {ex.Message}");
@@ -217,7 +217,7 @@ internal sealed class DiagnosticPublisher : IDisposable
         {
             // NOTE(daviburg): Debounce was superseded or document was closed — expected.
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync(
                 $"[DiagnosticPublisher] Debounced publish failed: {ex.Message}");
