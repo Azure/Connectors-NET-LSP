@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -18,7 +19,7 @@ using SdkLspServer.Diagnostics;
 namespace SdkLspServer.Handlers;
 
 internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManager bufferManager, SdkIndex? sdkIndex, DiagnosticPublisher diagnosticPublisher)
-    : IDidChangeTextDocumentHandler
+    : IDidChangeTextDocumentHandler, IDidOpenTextDocumentHandler, IDidSaveTextDocumentHandler, IDidCloseTextDocumentHandler
 {
     private readonly ILanguageServerFacade router = router;
     private readonly BufferManager bufferManager = bufferManager;
@@ -44,6 +45,30 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         {
             DocumentSelector = DocumentSelector,
             SyncKind = Change,
+        };
+    }
+
+    TextDocumentOpenRegistrationOptions IRegistration<TextDocumentOpenRegistrationOptions, TextSynchronizationCapability>.GetRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new TextDocumentOpenRegistrationOptions()
+        {
+            DocumentSelector = DocumentSelector,
+        };
+    }
+
+    TextDocumentSaveRegistrationOptions IRegistration<TextDocumentSaveRegistrationOptions, TextSynchronizationCapability>.GetRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new TextDocumentSaveRegistrationOptions()
+        {
+            DocumentSelector = DocumentSelector,
+        };
+    }
+
+    TextDocumentCloseRegistrationOptions IRegistration<TextDocumentCloseRegistrationOptions, TextSynchronizationCapability>.GetRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new TextDocumentCloseRegistrationOptions()
+        {
+            DocumentSelector = DocumentSelector,
         };
     }
 
