@@ -200,6 +200,8 @@ internal sealed class DiagnosticPublisher : IDisposable
         string documentText,
         CancellationToken cancellationToken)
     {
+        string key = documentUri.ToString();
+
         try
         {
             await Task.Delay(this.debounceInterval, cancellationToken)
@@ -219,6 +221,20 @@ internal sealed class DiagnosticPublisher : IDisposable
         {
             await Console.Error.WriteLineAsync(
                 $"[DiagnosticPublisher] Debounced publish failed: {ex.Message}");
+        }
+        finally
+        {
+            // Remove and dispose the CTS if it still matches the current entry
+            // (a newer ScheduleDebouncedPublish may have already replaced it).
+            lock (this.debounceLock)
+            {
+                if (this.pendingDebounce.TryGetValue(key, out CancellationTokenSource? stored) &&
+                    stored.Token == cancellationToken)
+                {
+                    this.pendingDebounce.Remove(key);
+                    stored.Dispose();
+                }
+            }
         }
     }
 }

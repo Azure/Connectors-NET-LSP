@@ -2,6 +2,8 @@
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //------------------------------------------------------------
 
+using System.Collections.Concurrent;
+
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
@@ -221,9 +223,14 @@ public class DiagnosticPublisherTests
     public async Task ScheduleDebouncedPublish_OnlyLastScheduledPublishFires()
     {
         // Arrange
-        var publishedParams = new List<PublishDiagnosticsParams>();
+        var publishedParams = new ConcurrentQueue<PublishDiagnosticsParams>();
+        var publishSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var publisher = new DiagnosticPublisher(
-            publishAction: parameters => publishedParams.Add(parameters),
+            publishAction: parameters =>
+            {
+                publishedParams.Enqueue(parameters);
+                publishSignal.TrySetResult();
+            },
             validators: Array.Empty<IDiagnosticValidator>(),
             sdkIndex: null,
             debounceInterval: TimeSpan.FromMilliseconds(50));
@@ -234,8 +241,12 @@ public class DiagnosticPublisherTests
         publisher.ScheduleDebouncedPublish(uri, "version2");
         publisher.ScheduleDebouncedPublish(uri, "version3");
 
-        // Wait for the debounce to fire
-        await Task.Delay(200)
+        // Wait for the publish signal or timeout
+        await Task.WhenAny(publishSignal.Task, Task.Delay(5000))
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Small additional delay to confirm no extra publishes arrive
+        await Task.Delay(100)
             .ConfigureAwait(continueOnCapturedContext: false);
 
         // Assert — only one publish should have occurred (from the last schedule)
@@ -246,9 +257,9 @@ public class DiagnosticPublisherTests
     public async Task ClearDiagnostics_CancelsPendingDebounce_NoDiagnosticsPublishedAfterClear()
     {
         // Arrange
-        var publishedParams = new List<PublishDiagnosticsParams>();
+        var publishedParams = new ConcurrentQueue<PublishDiagnosticsParams>();
         var publisher = new DiagnosticPublisher(
-            publishAction: parameters => publishedParams.Add(parameters),
+            publishAction: parameters => publishedParams.Enqueue(parameters),
             validators: Array.Empty<IDiagnosticValidator>(),
             sdkIndex: null,
             debounceInterval: TimeSpan.FromMilliseconds(100));
@@ -265,6 +276,8 @@ public class DiagnosticPublisherTests
         // Assert — only the ClearDiagnostics publish (empty array) should be present;
         // the debounced publish should have been cancelled
         Assert.AreEqual(1, publishedParams.Count, message: "Only the ClearDiagnostics call should publish.");
-        Assert.AreEqual(0, publishedParams[0].Diagnostics.Count(), message: "ClearDiagnostics should publish an empty array.");
+        publishedParams.TryPeek(out PublishDiagnosticsParams? clearParams);
+        Assert.IsNotNull(clearParams);
+        Assert.AreEqual(0, clearParams.Diagnostics.Count(), message: "ClearDiagnostics should publish an empty array.");
     }
 }
