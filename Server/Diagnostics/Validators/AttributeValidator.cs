@@ -355,6 +355,8 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// Extracts the simple identifier from a return type syntax node.
     /// For <c>System.Threading.Tasks.Task&lt;int&gt;</c> returns <c>"Task"</c>.
     /// For <c>Task</c> returns <c>"Task"</c>.
+    /// For <c>global::System.Threading.Tasks.Task</c> returns <c>"Task"</c>.
+    /// For <c>Task?</c> returns <c>"Task"</c>.
     /// </summary>
     private static string GetReturnTypeIdentifier(TypeSyntax returnType)
     {
@@ -362,6 +364,8 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         {
             GenericNameSyntax generic => generic.Identifier.Text,
             QualifiedNameSyntax qualified => AttributeValidator.GetReturnTypeIdentifier(qualified.Right),
+            AliasQualifiedNameSyntax aliasQualified => AttributeValidator.GetReturnTypeIdentifier(aliasQualified.Name),
+            NullableTypeSyntax nullable => AttributeValidator.GetReturnTypeIdentifier(nullable.ElementType),
             IdentifierNameSyntax identifier => identifier.Identifier.Text,
             _ => returnType.ToString(),
         };
@@ -391,12 +395,23 @@ internal sealed class AttributeValidator : IDiagnosticValidator
 
     /// <summary>
     /// Extracts the rightmost identifier from a potentially qualified attribute name.
-    /// For example, "MyNamespace.ConnectorTriggerMetadata" returns "ConnectorTriggerMetadata".
+    /// For example, "MyNamespace.ConnectorTriggerMetadata" and
+    /// "global::ConnectorTriggerMetadata" both return "ConnectorTriggerMetadata".
     /// </summary>
     private static string ExtractRightmostIdentifier(string attributeName)
     {
         int lastDot = attributeName.LastIndexOf('.');
-        return lastDot >= 0 ? attributeName.Substring(lastDot + 1) : attributeName;
+        int lastAliasQualifier = attributeName.LastIndexOf("::", StringComparison.Ordinal);
+
+        // Calculate the character position after each separator type.
+        // When not found (-1), use 0 so it doesn't affect the Max calculation.
+        int afterDot = lastDot >= 0 ? lastDot + 1 : 0;
+        int afterAlias = lastAliasQualifier >= 0 ? lastAliasQualifier + 2 : 0;
+        int identifierStartIndex = Math.Max(afterDot, afterAlias);
+
+        return identifierStartIndex > 0
+            ? attributeName.Substring(identifierStartIndex)
+            : attributeName;
     }
 
     /// <summary>
