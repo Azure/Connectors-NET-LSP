@@ -161,7 +161,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
 
     /// <summary>
     /// Validates a [ConnectorOperation] attribute.
-    /// Emits CSDK009.
+    /// Emits CSDK001–CSDK003 for ConnectorName and CSDK009 for OperationName.
     /// </summary>
     private void ValidateConnectorOperationAttribute(
         AttributeSyntax attribute,
@@ -181,6 +181,19 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         string? operationNameValue = AttributeValidator.ExtractStringValue(operationNameArgument);
 
         if (connectorNameValue is null || operationNameValue is null)
+        {
+            return;
+        }
+
+        // Validate ConnectorName first (CSDK001–CSDK003); skip CSDK009 if it doesn't resolve.
+        bool connectorResolved = this.ValidateConnectorName(
+            connectorNameValue,
+            connectorNameArgument,
+            sourceText,
+            sdkIndex,
+            diagnostics);
+
+        if (!connectorResolved)
         {
             return;
         }
