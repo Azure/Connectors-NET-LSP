@@ -278,6 +278,39 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_AsyncVoidMethod_EmitsCSdk006()
+    {
+        // Arrange
+        var validator = new AttributeValidator();
+        var sdkIndex = AttributeValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Threading.Tasks;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async void MyMethod() { await Task.Yield(); }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? signatureMismatch = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerMetadataSignatureMismatch, StringComparison.Ordinal));
+        Assert.IsNotNull(signatureMismatch, message: "Expected CSDK006 for async void trigger method.");
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_UnknownOperationName_EmitsCSdk007()
     {
         // Arrange

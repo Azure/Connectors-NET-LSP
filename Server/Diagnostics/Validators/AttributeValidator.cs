@@ -310,7 +310,11 @@ internal sealed class AttributeValidator : IDiagnosticValidator
 
         if (!found)
         {
-            string availableOperations = string.Join(", ", operations.Select(operation => operation.FieldName));
+            const int maxDisplayedOperations = 5;
+            IEnumerable<string> operationNames = operations.Select(operation => operation.FieldName);
+            string availableOperations = operations.Length <= maxDisplayedOperations
+                ? string.Join(", ", operationNames)
+                : string.Join(", ", operationNames.Take(maxDisplayedOperations)) + $", ... ({operations.Length} total)";
             diagnostics.Add(AttributeValidator.CreateDiagnostic(
                 AttributeValidator.GetArgumentValueRange(argument, sourceText),
                 LspDiagnosticSeverity.Error,
@@ -330,12 +334,6 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         string displayName,
         List<LspDiagnostic> diagnostics)
     {
-        // Check for async modifier
-        if (method.Modifiers.Any(SyntaxKind.AsyncKeyword))
-        {
-            return;
-        }
-
         // Extract the rightmost identifier from the return type to handle
         // both simple (Task) and fully-qualified (System.Threading.Tasks.Task) forms.
         string returnTypeIdentifier = AttributeValidator.GetReturnTypeIdentifier(method.ReturnType);
@@ -349,7 +347,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 AttributeValidator.GetAttributeNameRange(attribute, sourceText),
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerMetadataSignatureMismatch,
-                $"{displayName} is on a non-async method. Trigger callbacks should return Task or Task<T>."));
+                $"{displayName} is on a method that does not return Task, Task<T>, ValueTask, or ValueTask<T>. Trigger callbacks should use an async-compatible return type."));
         }
     }
 
@@ -374,9 +372,11 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// </summary>
     private static bool IsTriggerMetadataAttribute(string attributeName)
     {
-        return attributeName.Contains("ConnectorTriggerMetadata", StringComparison.Ordinal) ||
-               (attributeName.Contains("ConnectorTrigger", StringComparison.Ordinal) &&
-                !attributeName.Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
+        string identifier = AttributeValidator.ExtractRightmostIdentifier(attributeName);
+        return string.Equals(identifier, "ConnectorTriggerMetadata", StringComparison.Ordinal) ||
+               string.Equals(identifier, "ConnectorTriggerMetadataAttribute", StringComparison.Ordinal) ||
+               string.Equals(identifier, "ConnectorTrigger", StringComparison.Ordinal) ||
+               string.Equals(identifier, "ConnectorTriggerAttribute", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -384,8 +384,19 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// </summary>
     private static bool IsConnectorOperationAttribute(string attributeName)
     {
-        return attributeName.Contains("ConnectorOperation", StringComparison.Ordinal) &&
-               !attributeName.Contains("ConnectorTrigger", StringComparison.Ordinal);
+        string identifier = AttributeValidator.ExtractRightmostIdentifier(attributeName);
+        return string.Equals(identifier, "ConnectorOperation", StringComparison.Ordinal) ||
+               string.Equals(identifier, "ConnectorOperationAttribute", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Extracts the rightmost identifier from a potentially qualified attribute name.
+    /// For example, "MyNamespace.ConnectorTriggerMetadata" returns "ConnectorTriggerMetadata".
+    /// </summary>
+    private static string ExtractRightmostIdentifier(string attributeName)
+    {
+        int lastDot = attributeName.LastIndexOf('.');
+        return lastDot >= 0 ? attributeName.Substring(lastDot + 1) : attributeName;
     }
 
     /// <summary>
