@@ -605,7 +605,7 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
 
             return new CodeLensContainer(codeLenses);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             telemetry.TrackException(ex, new Dictionary<string, string>
             {

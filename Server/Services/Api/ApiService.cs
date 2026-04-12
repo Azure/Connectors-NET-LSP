@@ -165,7 +165,7 @@ public class ApiService
 
                     return response.IsSuccessStatusCode ? await response.Content.ReadAsStringAsync(ct) : null;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     await Console.Error.WriteLineAsync($"[ApiService] GET error: {ex.Message}");
                     return null;
@@ -202,7 +202,7 @@ public class ApiService
 
                     return await client.GetFromJsonAsync<T>(url, jsonOptions, ct);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     await Console.Error.WriteLineAsync($"[ApiService] GET JSON error: {ex.Message}");
                     return default;
@@ -251,7 +251,7 @@ public class ApiService
 
                     return null;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     await Console.Error.WriteLineAsync($"[ApiService] POST error: {ex.Message}");
                     return null;
@@ -306,7 +306,7 @@ public class ApiService
                     await Console.Error.WriteLineAsync($"[ApiService] POST non-success: {(int)response.StatusCode} {response.StatusCode}");
                     return default;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     await Console.Error.WriteLineAsync($"[ApiService] POST error: {ex.Message}");
                     return default;

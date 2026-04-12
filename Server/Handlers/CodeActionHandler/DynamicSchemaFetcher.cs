@@ -103,7 +103,7 @@ internal sealed class DynamicSchemaFetcher
             await Console.Error.WriteLineAsync($"[DynamicSchemaFetcher] Response does not look like a JSON Schema; returning null.");
             return null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[DynamicSchemaFetcher] Error fetching schema for {connectorName}:{operationId}: {ex.Message}");
             return null;

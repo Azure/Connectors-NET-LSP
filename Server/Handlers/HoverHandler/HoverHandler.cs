@@ -148,7 +148,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 Contents = new MarkedStringsOrMarkupContent(markupContent),
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             telemetry.TrackException(ex, new Dictionary<string, string>
             {
@@ -497,7 +497,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 return $"command:sdklsp.applyEdits?{encodedArgs}";
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[CreateInsertValueCommandUri] Error: {ex.Message}");
             Console.Error.WriteLine($"[CreateInsertValueCommandUri] Stack: {ex.StackTrace}");
@@ -588,7 +588,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                             loadedCount++;
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         await Console.Error.WriteLineAsync($"[HoverHandler] Failed to load assembly {assemblyPath}: {ex.Message}");
                     }
@@ -723,7 +723,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
             await Console.Error.WriteLineAsync("[HoverHandler] No symbol information found for node");
             return null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[HoverHandler] ❌ Exception in AnalyzeSymbolAtPositionAsync: {ex.GetType().Name}");
             await Console.Error.WriteLineAsync($"[HoverHandler] Message: {ex.Message}");
@@ -817,7 +817,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
             return result.ToString();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[FormatMethodInfo] Error formatting method {method.Name}: {ex.Message}");
             return $"```csharp\n{method.Name}(...)\n```\n\n(Error formatting method signature)";
@@ -1359,7 +1359,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
             return resolvedContext;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[ParameterContext] Exception: {ex}");
             return null;
@@ -1718,7 +1718,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
             return null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[FindConnectionParameterArgument] Error: {ex.Message}");
             Console.Error.WriteLine($"[FindConnectionParameterArgument] Stack: {ex.StackTrace}");
@@ -2146,7 +2146,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             Console.Error.WriteLine($"[HoverHandler] Failed to parse project.assets.json: {ex.Message}");
         }
@@ -2349,7 +2349,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
             return values;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[DynamicValues] Error fetching values for '{operationName}': {ex.Message}");
             return null;
@@ -2453,7 +2453,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 Description = item.DisplayName ?? item.Name ?? "Unknown",
             });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[FetchDynamicValuesDirect] Error for {connectorName}: {ex.Message}");
             return null;
@@ -2524,7 +2524,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 };
             });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[FetchDynamicValuesAsync] ❌ Exception caught: {ex.GetType().Name}");
             await Console.Error.WriteLineAsync($"[FetchDynamicValuesAsync] Error for {connectorName}: {ex.Message}");

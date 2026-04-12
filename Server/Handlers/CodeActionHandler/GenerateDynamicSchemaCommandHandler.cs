@@ -164,7 +164,7 @@ public class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
                 { "FilePath", Path.GetFileName(targetFilePath) },
             });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[GenerateCommand] Error: {ex.Message}\n{ex.StackTrace}");
             telemetry.TrackException(ex, new Dictionary<string, string>

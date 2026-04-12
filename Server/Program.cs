@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using OmniSharp.Extensions.LanguageServer.Server;
 
+using SdkLspServer.Diagnostics;
+using SdkLspServer.Diagnostics.Validators;
 using SdkLspServer.Handlers;
 using SdkLspServer.Handlers.CodeActionHandler;
 using SdkLspServer.Handlers.CompletionHandler;
@@ -110,7 +112,7 @@ internal static class Program
                          {
                              apiConfig.UpdateFrom(updateConfig);
                          }
-                         catch (Exception ex)
+                         catch (Exception ex) when (!ex.IsFatal())
                          {
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Failed to update apiConfig: {ex.Message}");
                          }
@@ -125,7 +127,7 @@ internal static class Program
                              int count = connectionsService.GetConnectionCount();
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ✅ Connections updated via notification: {count} connection(s)");
                          }
-                         catch (Exception ex)
+                         catch (Exception ex) when (!ex.IsFatal())
                          {
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Failed to update connections: {ex.Message}");
                          }
@@ -189,7 +191,7 @@ internal static class Program
                                 await Console.Error.WriteLineAsync("[SdkLspServer] ⚠️  No telemetry config provided in initializationOptions");
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!ex.IsFatal())
                         {
                             telemetryService?.TrackException(ex, new Dictionary<string, string>
                             {
@@ -243,7 +245,7 @@ internal static class Program
 
             await Console.Error.WriteLineAsync("[SdkLspServer] Server shutdown complete");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             await Console.Error.WriteLineAsync($"[SdkLspServer] ❌ Fatal error: {ex.Message}");
             await Console.Error.WriteLineAsync($"[SdkLspServer] Stack trace: {ex.StackTrace}");
@@ -296,6 +298,18 @@ internal static class Program
 
         // Register shared LSPStore for cross-handler communication (includes DynamicData slice)
         services.AddSingleton<Store.LSPStore>();
+
+        // Register diagnostic validators
+        services.AddSingleton<IDiagnosticValidator, SdkUsageValidator>();
+
+        // Register DiagnosticPublisher (resolved after server is built via ILanguageServerFacade)
+        services.AddSingleton<DiagnosticPublisher>(provider =>
+        {
+            var router = provider.GetRequiredService<OmniSharp.Extensions.LanguageServer.Protocol.Server.ILanguageServerFacade>();
+            var validators = provider.GetServices<IDiagnosticValidator>();
+            var sdkIndex = provider.GetService<SdkIndex>();
+            return new DiagnosticPublisher(router, validators, sdkIndex);
+        });
     }
 
     /// <summary>
