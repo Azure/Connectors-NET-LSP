@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using OmniSharp.Extensions.LanguageServer.Server;
 
+using SdkLspServer.Diagnostics;
+using SdkLspServer.Diagnostics.Validators;
 using SdkLspServer.Handlers;
 using SdkLspServer.Handlers.CodeActionHandler;
 using SdkLspServer.Handlers.CompletionHandler;
@@ -296,6 +298,18 @@ internal static class Program
 
         // Register shared LSPStore for cross-handler communication (includes DynamicData slice)
         services.AddSingleton<Store.LSPStore>();
+
+        // Register diagnostic validators
+        services.AddSingleton<IDiagnosticValidator, SdkUsageValidator>();
+
+        // Register DiagnosticPublisher (resolved after server is built via ILanguageServerFacade)
+        services.AddSingleton<DiagnosticPublisher>(provider =>
+        {
+            var router = provider.GetRequiredService<OmniSharp.Extensions.LanguageServer.Protocol.Server.ILanguageServerFacade>();
+            var validators = provider.GetServices<IDiagnosticValidator>();
+            var sdkIndex = provider.GetService<SdkIndex>();
+            return new DiagnosticPublisher(router, validators, sdkIndex);
+        });
     }
 
     /// <summary>

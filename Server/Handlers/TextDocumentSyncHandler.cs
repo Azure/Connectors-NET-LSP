@@ -13,14 +13,17 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 
+using SdkLspServer.Diagnostics;
+
 namespace SdkLspServer.Handlers;
 
-internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManager bufferManager, SdkIndex? sdkIndex)
+internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManager bufferManager, SdkIndex? sdkIndex, DiagnosticPublisher diagnosticPublisher)
     : IDidChangeTextDocumentHandler
 {
     private readonly ILanguageServerFacade router = router;
     private readonly BufferManager bufferManager = bufferManager;
     private readonly SdkIndex? sdkIndex = sdkIndex;
+    private readonly DiagnosticPublisher diagnosticPublisher = diagnosticPublisher;
 
     public TextDocumentSyncKind Change { get; } = TextDocumentSyncKind.Full;
 
@@ -57,11 +60,16 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
             TryRequestCodeLensRefresh(router);
         }
 
+        // Schedule debounced diagnostics on text change
+        this.diagnosticPublisher.ScheduleDebouncedPublish(
+            request.TextDocument.Uri,
+            text ?? string.Empty);
+
         return Unit.Task;
     }
 
 #pragma warning disable VSTHRD200 // LSP protocol handler names are defined by the framework
-    public Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
+    public async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         bufferManager.UpdateBuffer(request.TextDocument.Uri.ToString(), request.TextDocument.Text);
         if (!string.IsNullOrEmpty(request.TextDocument.Text) && MightContainSdkUsage(request.TextDocument.Text))
@@ -69,13 +77,35 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
             TryRequestCodeLensRefresh(router);
         }
 
-        return Unit.Task;
+        // Publish diagnostics immediately on document open
+        await this.diagnosticPublisher
+            .PublishDiagnosticsAsync(request.TextDocument.Uri, request.TextDocument.Text, cancellationToken)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        return Unit.Value;
     }
 
-    public Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
+    public async Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
     {
         // On save, trigger a refresh to ensure lenses appear immediately
         TryRequestCodeLensRefresh(router);
+
+        // Publish diagnostics immediately on save
+        string? text = this.bufferManager.GetBuffer(request.TextDocument.Uri.ToString());
+        if (text != null)
+        {
+            await this.diagnosticPublisher
+                .PublishDiagnosticsAsync(request.TextDocument.Uri, text, cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
+        }
+
+        return Unit.Value;
+    }
+
+    public Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
+    {
+        // Clear diagnostics when a document is closed
+        this.diagnosticPublisher.ClearDiagnostics(request.TextDocument.Uri);
         return Unit.Task;
     }
 #pragma warning restore VSTHRD200
