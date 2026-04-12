@@ -43,7 +43,7 @@ internal static class DiagnosticCodes
     /// <summary>OperationName is specified but the connector has no trigger operations.</summary>
     public const string OperationNameNoTriggers = "CSDK008";
 
-    /// <summary>[ConnectorOperation] references an operation not found in the SDK index.</summary>
+    /// <summary>[ConnectorOperation] references a trigger operation not found in the SDK index.</summary>
     public const string ConnectorOperationUnknown = "CSDK009";
 
     // ---------------------------------------------------------------

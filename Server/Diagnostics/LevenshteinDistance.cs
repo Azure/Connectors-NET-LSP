@@ -13,6 +13,7 @@ internal static class LevenshteinDistance
     /// <summary>
     /// Computes the minimum number of single-character edits (insertions, deletions,
     /// or substitutions) required to change <paramref name="source"/> into <paramref name="target"/>.
+    /// The comparison is case-insensitive (characters are compared via <see cref="char.ToLowerInvariant"/>).
     /// </summary>
     /// <param name="source">The source string.</param>
     /// <param name="target">The target string.</param>

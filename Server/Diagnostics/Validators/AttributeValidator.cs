@@ -213,8 +213,8 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 string.Equals(operation.FieldName, operationNameValue, StringComparison.OrdinalIgnoreCase));
 
             string message = foundInAny
-                ? $"[ConnectorOperation] operation '{operationNameValue}' exists but does not belong to connector '{connectorNameValue}'."
-                : $"[ConnectorOperation] operation '{operationNameValue}' not found in SDK index for connector '{connectorNameValue}'.";
+                ? $"[ConnectorOperation] trigger operation '{operationNameValue}' exists but does not belong to connector '{connectorNameValue}'."
+                : $"[ConnectorOperation] trigger operation '{operationNameValue}' not found in SDK index for connector '{connectorNameValue}'.";
 
             diagnostics.Add(AttributeValidator.CreateDiagnostic(
                 AttributeValidator.GetArgumentValueRange(operationNameArgument, sourceText),
