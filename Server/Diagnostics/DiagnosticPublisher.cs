@@ -110,6 +110,8 @@ internal sealed class DiagnosticPublisher : IDisposable
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         this.publishAction(new PublishDiagnosticsParams
         {
             Uri = documentUri,
@@ -202,6 +204,8 @@ internal sealed class DiagnosticPublisher : IDisposable
         {
             await Task.Delay(this.debounceInterval, cancellationToken)
                 .ConfigureAwait(continueOnCapturedContext: false);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             await this
                 .PublishDiagnosticsAsync(documentUri, documentText, cancellationToken)

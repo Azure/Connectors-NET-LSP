@@ -216,4 +216,55 @@ public class DiagnosticPublisherTests
         // Assert
         Assert.AreEqual(0, diagnostics.Count);
     }
+
+    [TestMethod]
+    public async Task ScheduleDebouncedPublish_OnlyLastScheduledPublishFires()
+    {
+        // Arrange
+        var publishedParams = new List<PublishDiagnosticsParams>();
+        var publisher = new DiagnosticPublisher(
+            publishAction: parameters => publishedParams.Add(parameters),
+            validators: Array.Empty<IDiagnosticValidator>(),
+            sdkIndex: null,
+            debounceInterval: TimeSpan.FromMilliseconds(50));
+        var uri = DocumentUri.From("file:///test.cs");
+
+        // Act — schedule three rapid changes; only the last should publish
+        publisher.ScheduleDebouncedPublish(uri, "version1");
+        publisher.ScheduleDebouncedPublish(uri, "version2");
+        publisher.ScheduleDebouncedPublish(uri, "version3");
+
+        // Wait for the debounce to fire
+        await Task.Delay(200)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — only one publish should have occurred (from the last schedule)
+        Assert.AreEqual(1, publishedParams.Count, message: "Only the last debounced publish should fire.");
+    }
+
+    [TestMethod]
+    public async Task ClearDiagnostics_CancelsPendingDebounce_NoDiagnosticsPublishedAfterClear()
+    {
+        // Arrange
+        var publishedParams = new List<PublishDiagnosticsParams>();
+        var publisher = new DiagnosticPublisher(
+            publishAction: parameters => publishedParams.Add(parameters),
+            validators: Array.Empty<IDiagnosticValidator>(),
+            sdkIndex: null,
+            debounceInterval: TimeSpan.FromMilliseconds(100));
+        var uri = DocumentUri.From("file:///test.cs");
+
+        // Act — schedule a debounced publish, then immediately clear
+        publisher.ScheduleDebouncedPublish(uri, "some text");
+        publisher.ClearDiagnostics(uri);
+
+        // Wait long enough for the debounce to have fired if it wasn't cancelled
+        await Task.Delay(300)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — only the ClearDiagnostics publish (empty array) should be present;
+        // the debounced publish should have been cancelled
+        Assert.AreEqual(1, publishedParams.Count, message: "Only the ClearDiagnostics call should publish.");
+        Assert.AreEqual(0, publishedParams[0].Diagnostics.Count(), message: "ClearDiagnostics should publish an empty array.");
+    }
 }
