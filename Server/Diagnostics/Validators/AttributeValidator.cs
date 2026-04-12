@@ -100,6 +100,8 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         AttributeArgumentSyntax? connectorNameArgument = AttributeValidator.FindNamedArgument(attribute, "ConnectorName");
         AttributeArgumentSyntax? operationNameArgument = AttributeValidator.FindNamedArgument(attribute, "OperationName");
 
+        string displayName = $"[{attribute.Name}]";
+
         // CSDK004: Missing ConnectorName
         if (connectorNameArgument is null)
         {
@@ -107,7 +109,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 AttributeValidator.GetAttributeNameRange(attribute, sourceText),
                 LspDiagnosticSeverity.Error,
                 DiagnosticCodes.TriggerMetadataMissingConnectorName,
-                "[ConnectorTriggerMetadata] is missing required 'ConnectorName' argument."));
+                $"{displayName} is missing required 'ConnectorName' argument."));
         }
 
         // CSDK005: Missing OperationName
@@ -117,7 +119,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 AttributeValidator.GetAttributeNameRange(attribute, sourceText),
                 LspDiagnosticSeverity.Error,
                 DiagnosticCodes.TriggerMetadataMissingOperationName,
-                "[ConnectorTriggerMetadata] is missing required 'OperationName' argument."));
+                $"{displayName} is missing required 'OperationName' argument."));
         }
 
         // Validate ConnectorName value (CSDK001, CSDK002, CSDK003)
@@ -153,7 +155,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         }
 
         // CSDK006: Signature mismatch
-        this.ValidateTriggerMethodSignature(attribute, method, sourceText, diagnostics);
+        this.ValidateTriggerMethodSignature(attribute, method, sourceText, displayName, diagnostics);
     }
 
     /// <summary>
@@ -318,21 +320,28 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Validates that the method signature follows the trigger callback pattern.
-    /// Emits CSDK006 if the method does not return Task or does not have an HttpTrigger parameter.
+    /// Validates that the method signature uses an async-compatible return type for the trigger callback pattern.
+    /// Emits CSDK006 if the method does not return Task, Task&lt;T&gt;, or ValueTask.
     /// </summary>
     private void ValidateTriggerMethodSignature(
         AttributeSyntax attribute,
         MethodDeclarationSyntax method,
         SourceText sourceText,
+        string displayName,
         List<LspDiagnostic> diagnostics)
     {
-        string returnType = method.ReturnType.ToString();
+        // Check for async modifier
+        if (method.Modifiers.Any(SyntaxKind.AsyncKeyword))
+        {
+            return;
+        }
 
-        // Check for Task-based return type
-        bool hasAsyncReturn = returnType.StartsWith("Task", StringComparison.Ordinal) ||
-                              returnType.StartsWith("async", StringComparison.Ordinal) ||
-                              returnType.StartsWith("ValueTask", StringComparison.Ordinal);
+        // Extract the rightmost identifier from the return type to handle
+        // both simple (Task) and fully-qualified (System.Threading.Tasks.Task) forms.
+        string returnTypeIdentifier = AttributeValidator.GetReturnTypeIdentifier(method.ReturnType);
+
+        bool hasAsyncReturn = string.Equals(returnTypeIdentifier, "Task", StringComparison.Ordinal) ||
+                              string.Equals(returnTypeIdentifier, "ValueTask", StringComparison.Ordinal);
 
         if (!hasAsyncReturn)
         {
@@ -340,8 +349,24 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 AttributeValidator.GetAttributeNameRange(attribute, sourceText),
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerMetadataSignatureMismatch,
-                "[ConnectorTriggerMetadata] is on a non-async method. Trigger callbacks should return Task or Task<T>."));
+                $"{displayName} is on a non-async method. Trigger callbacks should return Task or Task<T>."));
         }
+    }
+
+    /// <summary>
+    /// Extracts the simple identifier from a return type syntax node.
+    /// For <c>System.Threading.Tasks.Task&lt;int&gt;</c> returns <c>"Task"</c>.
+    /// For <c>Task</c> returns <c>"Task"</c>.
+    /// </summary>
+    private static string GetReturnTypeIdentifier(TypeSyntax returnType)
+    {
+        return returnType switch
+        {
+            GenericNameSyntax generic => generic.Identifier.Text,
+            QualifiedNameSyntax qualified => AttributeValidator.GetReturnTypeIdentifier(qualified.Right),
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            _ => returnType.ToString(),
+        };
     }
 
     /// <summary>

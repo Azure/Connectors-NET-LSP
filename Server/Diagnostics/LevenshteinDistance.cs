@@ -31,7 +31,14 @@ internal static class LevenshteinDistance
         int sourceLength = source.Length;
         int targetLength = target.Length;
 
-        // Use a single-row buffer to reduce memory from O(n*m) to O(min(n,m)).
+        // Swap so the shorter string is used for the row buffer, reducing memory to O(min(n,m)).
+        if (sourceLength < targetLength)
+        {
+            (source, target) = (target, source);
+            (sourceLength, targetLength) = (targetLength, sourceLength);
+        }
+
+        // Use a single-row buffer sized to the shorter dimension.
         int[] previousRow = new int[targetLength + 1];
         int[] currentRow = new int[targetLength + 1];
 
