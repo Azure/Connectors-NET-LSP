@@ -124,12 +124,13 @@ internal sealed class AttributeValidator : IDiagnosticValidator
 
         // Validate ConnectorName value (CSDK001, CSDK002, CSDK003)
         string? connectorNameValue = null;
+        bool connectorNameResolved = false;
         if (connectorNameArgument is not null)
         {
             connectorNameValue = AttributeValidator.ExtractStringValue(connectorNameArgument);
             if (connectorNameValue is not null)
             {
-                this.ValidateConnectorName(
+                connectorNameResolved = this.ValidateConnectorName(
                     connectorNameValue,
                     connectorNameArgument,
                     sourceText,
@@ -138,8 +139,8 @@ internal sealed class AttributeValidator : IDiagnosticValidator
             }
         }
 
-        // Validate OperationName value (CSDK007, CSDK008)
-        if (operationNameArgument is not null && connectorNameValue is not null)
+        // Validate OperationName value (CSDK007, CSDK008) only when ConnectorName resolves
+        if (operationNameArgument is not null && connectorNameValue is not null && connectorNameResolved)
         {
             string? operationNameValue = AttributeValidator.ExtractStringValue(operationNameArgument);
             if (operationNameValue is not null)
@@ -213,8 +214,9 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// <summary>
     /// Validates a ConnectorName value against the SDK index.
     /// Emits CSDK001 (unknown), CSDK002 (typo), or CSDK003 (casing).
+    /// Returns true if the connector name resolves to a known connector (even with casing issues).
     /// </summary>
-    private void ValidateConnectorName(
+    private bool ValidateConnectorName(
         string connectorNameValue,
         AttributeArgumentSyntax argument,
         SourceText sourceText,
@@ -223,18 +225,31 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     {
         ImmutableArray<SdkConstant> knownConnectors = sdkIndex.ConnectorNameConstants;
 
+        // Check if the argument is a constant reference (member access / identifier) vs a string literal.
+        // For string literals, only match against Value (the canonical form); FieldName matching
+        // would hide casing issues (e.g., literal "Office365" matching FieldName when Value is "office365").
+        bool isConstantReference = argument.Expression is MemberAccessExpressionSyntax or IdentifierNameSyntax;
+
         // Exact match — value is valid
-        if (knownConnectors.Any(connector =>
-            string.Equals(connector.Value, connectorNameValue, StringComparison.Ordinal) ||
-            string.Equals(connector.FieldName, connectorNameValue, StringComparison.Ordinal)))
+        bool exactMatch = isConstantReference
+            ? knownConnectors.Any(connector =>
+                string.Equals(connector.Value, connectorNameValue, StringComparison.Ordinal) ||
+                string.Equals(connector.FieldName, connectorNameValue, StringComparison.Ordinal))
+            : knownConnectors.Any(connector =>
+                string.Equals(connector.Value, connectorNameValue, StringComparison.Ordinal));
+
+        if (exactMatch)
         {
-            return;
+            return true;
         }
 
         // CSDK003: Case-insensitive match (wrong casing)
-        SdkConstant? casingMatch = knownConnectors.FirstOrDefault(connector =>
-            string.Equals(connector.Value, connectorNameValue, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(connector.FieldName, connectorNameValue, StringComparison.OrdinalIgnoreCase));
+        SdkConstant? casingMatch = isConstantReference
+            ? knownConnectors.FirstOrDefault(connector =>
+                string.Equals(connector.Value, connectorNameValue, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(connector.FieldName, connectorNameValue, StringComparison.OrdinalIgnoreCase))
+            : knownConnectors.FirstOrDefault(connector =>
+                string.Equals(connector.Value, connectorNameValue, StringComparison.OrdinalIgnoreCase));
 
         if (casingMatch is not null)
         {
@@ -243,7 +258,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.ConnectorNameCasing,
                 $"ConnectorName has wrong casing. Expected '{casingMatch.Value}' (or use ConnectorNames.{casingMatch.FieldName})."));
-            return;
+            return true;
         }
 
         // CSDK002: Typo detection (Levenshtein distance <= 2)
@@ -267,7 +282,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.ConnectorNameTypo,
                 $"Possible typo in ConnectorName '{connectorNameValue}'. Did you mean '{closestMatch.Value}' (ConnectorNames.{closestMatch.FieldName})?"));
-            return;
+            return false;
         }
 
         // CSDK001: Completely unknown
@@ -276,6 +291,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
             LspDiagnosticSeverity.Error,
             DiagnosticCodes.UnknownConnectorName,
             $"ConnectorName '{connectorNameValue}' does not match any known connector in the SDK."));
+        return false;
     }
 
     /// <summary>
@@ -325,7 +341,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
 
     /// <summary>
     /// Validates that the method signature uses an async-compatible return type for the trigger callback pattern.
-    /// Emits CSDK006 if the method does not return Task, Task&lt;T&gt;, or ValueTask.
+    /// Emits CSDK006 if the method does not return Task, Task&lt;T&gt;, ValueTask, or ValueTask&lt;T&gt;.
     /// </summary>
     private void ValidateTriggerMethodSignature(
         AttributeSyntax attribute,

@@ -28,13 +28,13 @@ internal static class DiagnosticCodes
     /// <summary>ConnectorName matches a known connector but with wrong casing.</summary>
     public const string ConnectorNameCasing = "CSDK003";
 
-    /// <summary>[ConnectorTriggerMetadata] is missing required ConnectorName.</summary>
+    /// <summary>A trigger attribute is missing required ConnectorName.</summary>
     public const string TriggerMetadataMissingConnectorName = "CSDK004";
 
-    /// <summary>[ConnectorTriggerMetadata] is missing required OperationName.</summary>
+    /// <summary>A trigger attribute is missing required OperationName.</summary>
     public const string TriggerMetadataMissingOperationName = "CSDK005";
 
-    /// <summary>[ConnectorTriggerMetadata] is on a method whose signature does not match the trigger callback pattern.</summary>
+    /// <summary>A trigger attribute is on a method whose signature does not match the trigger callback pattern.</summary>
     public const string TriggerMetadataSignatureMismatch = "CSDK006";
 
     /// <summary>OperationName does not match any known trigger operation for the connector.</summary>
