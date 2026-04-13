@@ -122,7 +122,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         // Look for connection parameters by name convention.
         foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
         {
-            string? parameterName = ConnectionConfigValidator.GetArgumentParameterName(argument, invocation);
+            string? parameterName = ConnectionConfigValidator.GetArgumentParameterName(argument);
             if (parameterName is null || !ConnectionConfigValidator.IsConnectionParameterName(parameterName))
             {
                 continue;
@@ -181,7 +181,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
                 // (auto-resolution would be ambiguous).
                 bool hasExplicitConnectionArg = invocation.ArgumentList.Arguments.Any(argument =>
                 {
-                    string? argumentParameterName = ConnectionConfigValidator.GetArgumentParameterName(argument, invocation);
+                    string? argumentParameterName = ConnectionConfigValidator.GetArgumentParameterName(argument);
                     return argumentParameterName is not null &&
                            ConnectionConfigValidator.IsConnectionParameterName(argumentParameterName);
                 });
@@ -363,7 +363,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
     /// Returns null for positional arguments since resolving parameter names by position
     /// would require a semantic model, which is not available in this validator.
     /// </summary>
-    private static string? GetArgumentParameterName(ArgumentSyntax argument, InvocationExpressionSyntax invocation)
+    private static string? GetArgumentParameterName(ArgumentSyntax argument)
     {
         // Named argument: the name is explicit.
         if (argument.NameColon is not null)

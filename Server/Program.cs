@@ -139,11 +139,12 @@ internal static class Program
 
                              // Re-trigger diagnostics on all open documents so connection
                              // diagnostics reflect the new connection state.
-                             if (diagnosticPublisher is not null)
+                             DiagnosticPublisher? publisher = Volatile.Read(ref diagnosticPublisher);
+                             if (publisher is not null)
                              {
                                  foreach (KeyValuePair<string, string> buffer in bufferManager.GetAllBuffers())
                                  {
-                                     diagnosticPublisher.ScheduleDebouncedPublish(
+                                     publisher.ScheduleDebouncedPublish(
                                          OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(buffer.Key),
                                          buffer.Value);
                                  }
@@ -255,7 +256,7 @@ internal static class Program
             telemetryService?.TrackEvent("LSP_Server_Started");
 
             // Resolve DiagnosticPublisher for notification-triggered re-validation
-            diagnosticPublisher = server.Services.GetService(typeof(DiagnosticPublisher)) as DiagnosticPublisher;
+            Volatile.Write(ref diagnosticPublisher, server.Services.GetService(typeof(DiagnosticPublisher)) as DiagnosticPublisher);
 
             await Console.Error.WriteLineAsync("[SdkLspServer] Server started successfully");
 
