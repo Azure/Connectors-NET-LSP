@@ -76,6 +76,13 @@ internal static class Program
             // Create connections service for runtime updates
             ConnectionsService connectionsService = new();
 
+            // Create buffer manager outside DI so notification handlers can access open documents
+            BufferManager bufferManager = new();
+
+            // Late-bound reference to DiagnosticPublisher for re-triggering diagnostics
+            // from notification handlers (resolved after DI container is built).
+            DiagnosticPublisher? diagnosticPublisher = null;
+
             LanguageServer server = await LanguageServer.From((options) =>
             {
                 options
@@ -97,6 +104,9 @@ internal static class Program
 
                         // Register ConnectionsService as singleton
                         services.AddSingleton(connectionsService);
+
+                        // Register BufferManager as singleton (created before server for notification handler access)
+                        services.AddSingleton(bufferManager);
 
                         // Make ApiServiceConfig available for dependency injection
                         services.AddSingleton(apiConfig);
@@ -126,6 +136,18 @@ internal static class Program
                              connectionsService.UpdateConnections(updatedConnections);
                              int count = connectionsService.GetConnectionCount();
                              await Console.Error.WriteLineAsync($"[SdkLspServer] ✅ Connections updated via notification: {count} connection(s)");
+
+                             // Re-trigger diagnostics on all open documents so connection
+                             // diagnostics reflect the new connection state.
+                             if (diagnosticPublisher is not null)
+                             {
+                                 foreach (KeyValuePair<string, string> buffer in bufferManager.GetAllBuffers())
+                                 {
+                                     diagnosticPublisher.ScheduleDebouncedPublish(
+                                         OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(buffer.Key),
+                                         buffer.Value);
+                                 }
+                             }
                          }
                          catch (Exception ex) when (!ex.IsFatal())
                          {
@@ -232,6 +254,9 @@ internal static class Program
             telemetryService = server.Services.GetService(typeof(ITelemetryService)) as ITelemetryService;
             telemetryService?.TrackEvent("LSP_Server_Started");
 
+            // Resolve DiagnosticPublisher for notification-triggered re-validation
+            diagnosticPublisher = server.Services.GetService(typeof(DiagnosticPublisher)) as DiagnosticPublisher;
+
             await Console.Error.WriteLineAsync("[SdkLspServer] Server started successfully");
 
             // Wait for the server to exit. This call blocks until the client shuts
@@ -263,8 +288,6 @@ internal static class Program
 
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton<BufferManager>();
-
         // Add HttpClient for making dynamic API calls
         services.AddHttpClient("SdkLspClient", client =>
         {
@@ -302,6 +325,8 @@ internal static class Program
         // Register diagnostic validators
         services.AddSingleton<IDiagnosticValidator, SdkUsageValidator>();
         services.AddSingleton<IDiagnosticValidator, AttributeValidator>();
+        services.AddSingleton<IDiagnosticValidator>(provider =>
+            new ConnectionConfigValidator(provider.GetRequiredService<ConnectionsService>()));
 
         // Register DiagnosticPublisher (resolved after server is built via ILanguageServerFacade)
         services.AddSingleton<DiagnosticPublisher>(provider =>

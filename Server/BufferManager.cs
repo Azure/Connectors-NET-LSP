@@ -18,4 +18,13 @@ public class BufferManager
     {
         return buffers.TryRemove(documentPath, out _);
     }
+
+    /// <summary>
+    /// Gets all currently tracked document paths and their contents.
+    /// Used to re-trigger diagnostics when external state (e.g., connections) changes.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> GetAllBuffers()
+    {
+        return this.buffers;
+    }
 }
