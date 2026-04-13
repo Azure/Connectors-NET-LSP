@@ -76,7 +76,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
 
             if (node is InvocationExpressionSyntax invocation)
             {
-                this.ValidateInvocationArguments(invocation, sourceText, connections, referencedConnectorTypes, diagnostics);
+                this.ValidateInvocationArguments(invocation, sourceText, connections, referencedConnectorTypes, diagnostics, sdkIndex);
             }
             else if (node is AttributeSyntax attribute)
             {
@@ -112,10 +112,19 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         SourceText sourceText,
         ConnectionsConfig connections,
         Dictionary<string, TextSpan> referencedConnectorTypes,
-        List<LspDiagnostic> diagnostics)
+        List<LspDiagnostic> diagnostics,
+        SdkIndex? sdkIndex)
     {
         // Infer the connector type once per invocation (used for CSDK102 and CSDK104).
+        // Filter against known connectors (sdkIndex) or configured connection types to avoid
+        // false positives from arbitrary *Client types (e.g., HttpClient -> "http").
         string? invokedConnectorType = ConnectionConfigValidator.InferConnectorTypeFromInvocation(invocation);
+        if (invokedConnectorType is not null &&
+            !ConnectionConfigValidator.IsKnownConnectorType(invokedConnectorType, sdkIndex, connections))
+        {
+            invokedConnectorType = null;
+        }
+
         if (invokedConnectorType is not null)
         {
             referencedConnectorTypes.TryAdd(invokedConnectorType, invocation.Expression.Span);
@@ -183,9 +192,24 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
                 // (auto-resolution would be ambiguous).
                 bool hasExplicitConnectionArg = invocation.ArgumentList.Arguments.Any(argument =>
                 {
+                    // Named connection argument.
                     string? argumentParameterName = ConnectionConfigValidator.GetArgumentParameterName(argument);
-                    return argumentParameterName is not null &&
-                           ConnectionConfigValidator.IsConnectionParameterName(argumentParameterName);
+                    if (argumentParameterName is not null &&
+                        ConnectionConfigValidator.IsConnectionParameterName(argumentParameterName))
+                    {
+                        return true;
+                    }
+
+                    // Positional string literal matching a configured connection name.
+                    if (argument.Expression is LiteralExpressionSyntax positionalLiteral &&
+                        positionalLiteral.IsKind(SyntaxKind.StringLiteralExpression))
+                    {
+                        string positionalValue = positionalLiteral.Token.ValueText;
+                        return matchingConnections.Any(connectionName =>
+                            string.Equals(connectionName, positionalValue, StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    return false;
                 });
 
                 if (!hasExplicitConnectionArg)
@@ -326,6 +350,34 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         return value.Contains("://", StringComparison.Ordinal) ||
                value.Contains("/subscriptions/", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("apim/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Checks whether an inferred connector type is a known connector.
+    /// When the SDK index is available, validates against known connector names.
+    /// When the SDK index is unavailable, accepts any inferred type to allow
+    /// CSDK102 to report missing connections (accepting some false positives
+    /// from arbitrary types like HttpClient is better than missing real issues).
+    /// </summary>
+    private static bool IsKnownConnectorType(string connectorType, SdkIndex? sdkIndex, ConnectionsConfig connections)
+    {
+        // Always accept types that have configured connections.
+        IEnumerable<string> configuredTypes = ConnectionsHelper.GetConnectorTypes(connections);
+        if (configuredTypes.Any(type =>
+            string.Equals(type, connectorType, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        // Check against SDK index (most reliable filter for false positives).
+        if (sdkIndex is not null)
+        {
+            return sdkIndex.ConnectorNameConstants.Any(connector =>
+                string.Equals(connector.Value, connectorType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Without SDK index, accept any inferred type.
+        return true;
     }
 
     /// <summary>
