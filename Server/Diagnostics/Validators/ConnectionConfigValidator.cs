@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis.Text;
 
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
-using SdkLspServer;
 using SdkLspServer.Services.Connections;
 
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
