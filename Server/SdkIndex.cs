@@ -53,6 +53,23 @@ public sealed class SdkIndex
     }
 
     /// <summary>
+    /// Creates an <see cref="SdkIndex"/> with explicit connector names and trigger operations.
+    /// Intended for unit testing only.
+    /// </summary>
+    internal static SdkIndex CreateForTesting(
+        IEnumerable<SdkConstant> connectorNames,
+        IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations)
+    {
+        return new SdkIndex(
+            source: "test",
+            root: string.Empty,
+            assemblies: Array.Empty<string>(),
+            types: Array.Empty<string>(),
+            connectorNames: connectorNames,
+            triggerOps: triggerOperations);
+    }
+
+    /// <summary>
     /// Gets trigger operations for a specific connector name (case-insensitive).
     /// </summary>
     public ImmutableArray<SdkConstant> GetTriggerOperations(string connectorName)
