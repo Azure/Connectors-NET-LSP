@@ -20,7 +20,7 @@ public class BufferManager
     }
 
     /// <summary>
-    /// Gets all currently tracked document paths and their contents.
+    /// Gets all currently tracked document URIs and their contents.
     /// Used to re-trigger diagnostics when external state (e.g., connections) changes.
     /// </summary>
     public IReadOnlyDictionary<string, string> GetAllBuffers()

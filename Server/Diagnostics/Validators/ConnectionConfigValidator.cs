@@ -336,8 +336,8 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Infers the connector type from a method invocation by examining the containing type name.
-    /// For example: <c>office365Client.GetEmailAsync(...)</c> infers "office365".
+    /// Infers the connector type from a method invocation by examining the member-access receiver identifier text.
+    /// For example: <c>office365Client.GetEmailAsync(...)</c> uses <c>office365Client</c> to infer "office365".
     /// </summary>
     private static string? InferConnectorTypeFromInvocation(InvocationExpressionSyntax invocation)
     {
