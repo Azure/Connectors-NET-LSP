@@ -58,13 +58,14 @@ public sealed class SdkIndex
     /// </summary>
     internal static SdkIndex CreateForTesting(
         IEnumerable<SdkConstant> connectorNames,
-        IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations)
+        IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations,
+        IEnumerable<string>? typeNames = null)
     {
         return new SdkIndex(
             source: "test",
             root: string.Empty,
             assemblies: Array.Empty<string>(),
-            types: Array.Empty<string>(),
+            types: typeNames ?? Array.Empty<string>(),
             connectorNames: connectorNames,
             triggerOps: triggerOperations);
     }

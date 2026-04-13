@@ -1,0 +1,687 @@
+//------------------------------------------------------------
+// Copyright (c) Microsoft Corporation.  All rights reserved.
+//------------------------------------------------------------
+
+using System.Collections.Immutable;
+
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+
+using SdkLspServer.Diagnostics;
+using SdkLspServer.Diagnostics.Validators;
+
+namespace SdkLspServer.Tests;
+
+[TestClass]
+public class TriggerPayloadValidatorTests
+{
+    private static SdkIndex CreateMockSdkIndex()
+    {
+        return SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Teams", "teams", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
+            {
+                ["office365"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations"),
+                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                ["teams"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsTriggerOperations")),
+            },
+            typeNames: new[]
+            {
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailMentioningMeTriggerPayload",
+                "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsOnNewChannelMessageTriggerPayload",
+                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
+                "Microsoft.Azure.Connectors.Sdk.TriggerCallbackPayload",
+            });
+    }
+
+    // ---------------------------------------------------------------
+    // Correct usage — no diagnostics
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_CorrectPayloadType_NoDiagnostic()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Office365OnNewEmailTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for correct payload type.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_NoTriggerAttribute_NoDiagnostic()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Office365OnNewEmailTriggerPayload>(body);
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected when method has no trigger attribute.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_NoDiagnostic()
+    {
+        // Arrange — SharepointOnline has no trigger operations, so no expected payload
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
+            {
+                ["sharepointonline"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewItem", "OnNewItem", "SharepointonlineTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Sharepointonline.SharepointonlineTriggerOperations")),
+            });
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "sharepointonline", OperationName = "OnNewItem")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for weak type when no typed payload exists.");
+    }
+
+    // ---------------------------------------------------------------
+    // CSDK200: Deserialize<T> type mismatch
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_WrongPayloadType_EmitsCSdk200()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<TeamsOnNewChannelMessageTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? mismatch = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeMismatch, StringComparison.Ordinal));
+        Assert.IsNotNull(mismatch, message: "Expected CSDK200 for wrong payload type.");
+        Assert.AreEqual(DiagnosticSeverity.Error, mismatch.Severity);
+        Assert.IsTrue(mismatch.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+    }
+
+    // ---------------------------------------------------------------
+    // CSDK201: Deserialize<T> uses weak type
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_ObjectType_EmitsCSdk201()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for weak type 'object'.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, weakType.Severity);
+        Assert.IsTrue(weakType.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_DynamicType_EmitsCSdk201()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<dynamic>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for weak type 'dynamic'.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, weakType.Severity);
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_JsonElementType_EmitsCSdk201()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<JsonElement>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for weak type 'JsonElement'.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, weakType.Severity);
+    }
+
+    // ---------------------------------------------------------------
+    // CSDK202: Generic argument type not found
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_UnknownType_EmitsCSdk202()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<CompletelyFakeType>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? notFound = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeNotFound, StringComparison.Ordinal));
+        Assert.IsNotNull(notFound, message: "Expected CSDK202 for unknown type.");
+        Assert.AreEqual(DiagnosticSeverity.Error, notFound.Severity);
+        Assert.IsTrue(notFound.Message.Contains("CompletelyFakeType", StringComparison.Ordinal));
+        Assert.IsTrue(notFound.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+    }
+
+    // ---------------------------------------------------------------
+    // CSDK203: Operation name doesn't map to payload type
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_OperationWithNoPayloadMapping_EmitsCSdk203()
+    {
+        // Arrange — create an index where the operation exists but no matching type name
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
+            {
+                ["office365"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+            },
+            typeNames: new[]
+            {
+                // No payload type for OnNewEmail — simulates a missing TriggerPayload class
+                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
+            });
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<GraphClientReceiveMessage>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? unmapped = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadOperationUnmapped, StringComparison.Ordinal));
+        Assert.IsNotNull(unmapped, message: "Expected CSDK203 when operation has no payload mapping.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, unmapped.Severity);
+        Assert.IsTrue(unmapped.Message.Contains("OnNewEmail", StringComparison.Ordinal));
+    }
+
+    // ---------------------------------------------------------------
+    // CSDK204: Type is not a TriggerCallbackPayload subclass
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_NonPayloadType_EmitsCSdk204()
+    {
+        // Arrange — GraphClientReceiveMessage exists but is not a *TriggerPayload
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<GraphClientReceiveMessage>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? notPayload = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadNotPayloadType, StringComparison.Ordinal));
+        Assert.IsNotNull(notPayload, message: "Expected CSDK204 for non-payload type.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, notPayload.Severity);
+        Assert.IsTrue(notPayload.Message.Contains("GraphClientReceiveMessage", StringComparison.Ordinal));
+        Assert.IsTrue(notPayload.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+    }
+
+    // ---------------------------------------------------------------
+    // Edge cases
+    // ---------------------------------------------------------------
+    [TestMethod]
+    public async Task ValidateAsync_ConnectorNameAsConstant_ResolvesCorrectly()
+    {
+        // Arrange — uses ConnectorNames.Office365 member access syntax
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Office365OnNewEmailTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            public static class ConnectorNames { public const string Office365 = "office365"; }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected when connector name constant resolves correctly.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_DeserializeAsyncMethod_ValidatesPayload()
+    {
+        // Arrange — DeserializeAsync should also be checked
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = await JsonSerializer.DeserializeAsync<object>(stream);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for DeserializeAsync with weak type.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_NullSdkIndex_NoDiagnostic()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected when SDK index is null.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_EmptyDocument_NoDiagnostic()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = string.Empty;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for empty document.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_DiagnosticRangeOnTypeArgument_PreciseRange()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(1, diagnostics.Count, message: "Expected exactly one diagnostic.");
+        Diagnostic diagnostic = diagnostics[0];
+
+        // The diagnostic range should be on "object" inside Deserialize<object>
+        Assert.IsTrue(
+            diagnostic.Range.Start.Line == diagnostic.Range.End.Line,
+            message: "Diagnostic should be on a single line.");
+        Assert.IsTrue(
+            diagnostic.Range.End.Character > diagnostic.Range.Start.Character,
+            message: "Diagnostic should have non-zero width covering the type argument.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_MultipleDeserializeCalls_EmitsMultipleDiagnostics()
+    {
+        // Arrange
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var a = JsonSerializer.Deserialize<object>(body1);
+                    var b = JsonSerializer.Deserialize<dynamic>(body2);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(2, diagnostics.Count, message: "Expected two diagnostics for two weak-type Deserialize calls.");
+        Assert.IsTrue(diagnostics.All(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal)));
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_NonDeserializeGenericMethod_NoDiagnostic()
+    {
+        // Arrange — generic method that is NOT a deserialization call
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var list = new List<object>();
+                    var result = Activator.CreateInstance<object>();
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for non-deserialization generic methods.");
+    }
+}
