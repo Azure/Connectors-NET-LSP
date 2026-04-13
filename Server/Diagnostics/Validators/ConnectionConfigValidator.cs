@@ -155,7 +155,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
                     valueRange,
                     LspDiagnosticSeverity.Information,
                     DiagnosticCodes.ConnectionParameterHardCoded,
-                    $"Connection parameter uses a hard-coded value '{connectionValue}'. Consider using a configuration setting or environment variable."));
+                    "Connection parameter uses a hard-coded value. Consider using a configuration setting or environment variable."));
                 continue;
             }
 
