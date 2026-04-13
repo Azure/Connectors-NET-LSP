@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 
 public class BufferManager
 {
@@ -25,6 +26,7 @@ public class BufferManager
     /// </summary>
     public IReadOnlyDictionary<string, string> GetAllBuffers()
     {
-        return new Dictionary<string, string>(this.buffers, StringComparer.Ordinal);
+        return new ReadOnlyDictionary<string, string>(
+            new Dictionary<string, string>(this.buffers, this.buffers.Comparer));
     }
 }

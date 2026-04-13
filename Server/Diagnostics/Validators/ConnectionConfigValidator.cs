@@ -70,16 +70,18 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         // Maps connector type -> first usage location for meaningful diagnostic placement.
         var referencedConnectorTypes = new Dictionary<string, TextSpan>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        foreach (SyntaxNode node in root.DescendantNodes())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateInvocationArguments(invocation, sourceText, connections, referencedConnectorTypes, diagnostics);
-        }
 
-        foreach (AttributeSyntax attribute in root.DescendantNodes().OfType<AttributeSyntax>())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateAttributeConnectionArguments(attribute, sourceText, connections, referencedConnectorTypes, diagnostics);
+            if (node is InvocationExpressionSyntax invocation)
+            {
+                this.ValidateInvocationArguments(invocation, sourceText, connections, referencedConnectorTypes, diagnostics);
+            }
+            else if (node is AttributeSyntax attribute)
+            {
+                this.ValidateAttributeConnectionArguments(attribute, sourceText, connections, referencedConnectorTypes, diagnostics);
+            }
         }
 
         // CSDK102: No connection configured for referenced connectors.

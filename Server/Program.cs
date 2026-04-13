@@ -326,8 +326,7 @@ internal static class Program
         // Register diagnostic validators
         services.AddSingleton<IDiagnosticValidator, SdkUsageValidator>();
         services.AddSingleton<IDiagnosticValidator, AttributeValidator>();
-        services.AddSingleton<IDiagnosticValidator>(provider =>
-            new ConnectionConfigValidator(provider.GetRequiredService<ConnectionsService>()));
+        services.AddSingleton<IDiagnosticValidator, ConnectionConfigValidator>();
 
         // Register DiagnosticPublisher (resolved after server is built via ILanguageServerFacade)
         services.AddSingleton<DiagnosticPublisher>(provider =>
