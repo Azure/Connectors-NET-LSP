@@ -312,8 +312,15 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         List<LspDiagnostic> diagnostics)
     {
         string? actualConnectorType = ConnectionConfigValidator.GetConnectionConnectorType(connections, connectionName);
-        if (actualConnectorType is not null &&
-            !string.Equals(actualConnectorType, expectedConnectorType, StringComparison.OrdinalIgnoreCase))
+
+        // Skip mismatch check when the actual type is unknown or empty (malformed config).
+        if (string.IsNullOrEmpty(actualConnectorType) ||
+            string.Equals(actualConnectorType, "unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!string.Equals(actualConnectorType, expectedConnectorType, StringComparison.OrdinalIgnoreCase))
         {
             diagnostics.Add(ConnectionConfigValidator.CreateDiagnostic(
                 valueRange,
