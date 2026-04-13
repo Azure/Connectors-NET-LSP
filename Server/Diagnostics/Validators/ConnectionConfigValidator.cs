@@ -226,13 +226,16 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             referencedConnectorTypes.TryAdd(connectorType, span);
 
             // CSDK104: Multiple connections for this connector type.
-            List<string> matchingConnections = ConnectionsHelper
-                .GetConnectionNamesForConnector(connections, connectorType)
-                .ToList();
+            // Suppress when ConnectionName is explicitly provided (it disambiguates).
+            bool hasExplicitConnectionName = ConnectionConfigValidator.FindNamedArgument(attribute, "ConnectionName") is not null;
 
-            if (matchingConnections.Count > 1)
+            if (!hasExplicitConnectionName)
             {
-                if (connectorNameArg is not null)
+                List<string> matchingConnections = ConnectionsHelper
+                    .GetConnectionNamesForConnector(connections, connectorType)
+                    .ToList();
+
+                if (matchingConnections.Count > 1 && connectorNameArg is not null)
                 {
                     diagnostics.Add(ConnectionConfigValidator.CreateDiagnostic(
                         ConnectionConfigValidator.ToLspRange(connectorNameArg.Expression.Span, sourceText),
@@ -356,7 +359,9 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Gets the parameter name for an argument, either from a named argument or by position.
+    /// Gets the parameter name for a named argument.
+    /// Returns null for positional arguments since resolving parameter names by position
+    /// would require a semantic model, which is not available in this validator.
     /// </summary>
     private static string? GetArgumentParameterName(ArgumentSyntax argument, InvocationExpressionSyntax invocation)
     {
@@ -366,8 +371,8 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             return argument.NameColon.Name.Identifier.Text;
         }
 
-        // Positional argument: use the argument's index as a fallback heuristic.
-        // Without semantic model, we can only guess based on position.
+        // Positional arguments are not analyzed — without a semantic model
+        // we cannot resolve parameter names from position.
         return null;
     }
 
