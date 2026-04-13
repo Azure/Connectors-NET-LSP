@@ -2,9 +2,12 @@
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //------------------------------------------------------------
 
+using System.Collections.Immutable;
+
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
+using SdkLspServer;
 using SdkLspServer.Diagnostics;
 using SdkLspServer.Diagnostics.Validators;
 using SdkLspServer.Services.Connections;
@@ -14,6 +17,18 @@ namespace SdkLspServer.Tests;
 [TestClass]
 public class ConnectionConfigValidatorTests
 {
+    private static SdkIndex CreateMockSdkIndex()
+    {
+        return SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Teams", "teams", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>());
+    }
+
     private static ConnectionsConfig CreateTestConnections(
         Dictionary<string, ManagedApiConnection>? managedApiConnections = null,
         Dictionary<string, DirectClientConnection>? directClientConnections = null)
@@ -578,7 +593,7 @@ public class ConnectionConfigValidatorTests
 
         // Act
         IReadOnlyList<Diagnostic> diagnostics = await validator
-            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ValidateAsync(uri, code, sdkIndex: ConnectionConfigValidatorTests.CreateMockSdkIndex(), CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
         // Assert
@@ -685,7 +700,7 @@ public class ConnectionConfigValidatorTests
 
         // Act
         IReadOnlyList<Diagnostic> diagnostics = await validator
-            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ValidateAsync(uri, code, sdkIndex: ConnectionConfigValidatorTests.CreateMockSdkIndex(), CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
         // Assert

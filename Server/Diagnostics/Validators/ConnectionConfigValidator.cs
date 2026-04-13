@@ -361,10 +361,9 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
 
     /// <summary>
     /// Checks whether an inferred connector type is a known connector.
-    /// When the SDK index is available, validates against known connector names.
-    /// When the SDK index is unavailable, accepts any inferred type to allow
-    /// CSDK102 to report missing connections (accepting some false positives
-    /// from arbitrary types like HttpClient is better than missing real issues).
+    /// Validates against the SDK index (when available) and configured connection types.
+    /// When the SDK index is unavailable, only accepts types that have configured connections
+    /// to avoid false positives from arbitrary receiver types (e.g., HttpClient -> "http").
     /// </summary>
     private static bool IsKnownConnectorType(string connectorType, SdkIndex? sdkIndex, ConnectionsConfig connections)
     {
@@ -383,8 +382,8 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
                 string.Equals(connector.Value, connectorType, StringComparison.OrdinalIgnoreCase));
         }
 
-        // Without SDK index, accept any inferred type.
-        return true;
+        // Without SDK index and no matching configured connection, reject to avoid false positives.
+        return false;
     }
 
     /// <summary>
