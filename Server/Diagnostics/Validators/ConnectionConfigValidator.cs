@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Text;
 
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
+using SdkLspServer;
 using SdkLspServer.Services.Connections;
 
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
@@ -100,8 +101,8 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
 
     /// <summary>
     /// Validates connection-related arguments in method invocations.
-    /// Detects CSDK100 (invalid value), CSDK101 (hard-coded), CSDK103 (missing),
-    /// CSDK104 (ambiguous), and CSDK105 (type mismatch).
+    /// Detects CSDK100 (invalid value), CSDK101 (hard-coded), CSDK104 (ambiguous),
+    /// and CSDK105 (type mismatch).
     /// </summary>
     private void ValidateInvocationArguments(
         InvocationExpressionSyntax invocation,
@@ -176,14 +177,13 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
 
             if (matchingConnections.Count > 1)
             {
-                // Only emit when there's a connection parameter with no explicit value
+                // Only emit when there's no explicitly provided connection parameter
                 // (auto-resolution would be ambiguous).
                 bool hasExplicitConnectionArg = invocation.ArgumentList.Arguments.Any(argument =>
                 {
                     string? argumentParameterName = ConnectionConfigValidator.GetArgumentParameterName(argument, invocation);
                     return argumentParameterName is not null &&
-                           ConnectionConfigValidator.IsConnectionParameterName(argumentParameterName) &&
-                           argument.Expression is LiteralExpressionSyntax;
+                           ConnectionConfigValidator.IsConnectionParameterName(argumentParameterName);
                 });
 
                 if (!hasExplicitConnectionArg)
@@ -339,8 +339,16 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
     {
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
-            string receiverText = memberAccess.Expression.ToString();
-            return DynamicValuesHelper.InferConnectorFromContainingType(receiverText);
+            // Extract just the rightmost identifier from the receiver to handle
+            // qualifiers like "this.office365Client" or "foo.office365Client".
+            string receiverIdentifier = memberAccess.Expression switch
+            {
+                MemberAccessExpressionSyntax nestedAccess => nestedAccess.Name.Identifier.Text,
+                IdentifierNameSyntax identifier => identifier.Identifier.Text,
+                _ => memberAccess.Expression.ToString(),
+            };
+
+            return DynamicValuesHelper.InferConnectorFromContainingType(receiverIdentifier);
         }
 
         return null;
@@ -386,20 +394,13 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             return null;
         }
 
+        // Only analyze string literals to avoid false positives when constants or
+        // member access expressions are used (e.g., ConnectorNames.Office365).
+        // Without a semantic model, we cannot resolve constant values.
         if (argument.Expression is LiteralExpressionSyntax literal &&
             literal.IsKind(SyntaxKind.StringLiteralExpression))
         {
             return literal.Token.ValueText;
-        }
-
-        if (argument.Expression is MemberAccessExpressionSyntax memberAccess)
-        {
-            return memberAccess.Name.Identifier.Text;
-        }
-
-        if (argument.Expression is IdentifierNameSyntax identifier)
-        {
-            return identifier.Identifier.Text;
         }
 
         return null;

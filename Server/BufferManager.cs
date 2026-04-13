@@ -25,6 +25,6 @@ public class BufferManager
     /// </summary>
     public IReadOnlyDictionary<string, string> GetAllBuffers()
     {
-        return this.buffers;
+        return new Dictionary<string, string>(this.buffers, StringComparer.Ordinal);
     }
 }
