@@ -67,7 +67,8 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             .ConfigureAwait(continueOnCapturedContext: false);
 
         // Track connector types referenced by this document for CSDK102 analysis.
-        var referencedConnectorTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Maps connector type -> first usage location for meaningful diagnostic placement.
+        var referencedConnectorTypes = new Dictionary<string, TextSpan>(StringComparer.OrdinalIgnoreCase);
 
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
@@ -82,17 +83,17 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         }
 
         // CSDK102: No connection configured for referenced connectors.
-        foreach (string connectorType in referencedConnectorTypes)
+        foreach (KeyValuePair<string, TextSpan> entry in referencedConnectorTypes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            IEnumerable<string> connectionNames = ConnectionsHelper.GetConnectionNamesForConnector(connections, connectorType);
+            IEnumerable<string> connectionNames = ConnectionsHelper.GetConnectionNamesForConnector(connections, entry.Key);
             if (!connectionNames.Any())
             {
                 diagnostics.Add(ConnectionConfigValidator.CreateDiagnostic(
-                    new LspRange(new LspPosition(0, 0), new LspPosition(0, 0)),
+                    ConnectionConfigValidator.ToLspRange(entry.Value, sourceText),
                     LspDiagnosticSeverity.Error,
                     DiagnosticCodes.NoConnectionConfigured,
-                    $"No connection configured for connector '{connectorType}'. Add a connection in local.settings.json or connections.json."));
+                    $"No connection configured for connector '{entry.Key}'. Add a connection in local.settings.json or connections.json."));
             }
         }
 
@@ -108,9 +109,16 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SourceText sourceText,
         ConnectionsConfig connections,
-        HashSet<string> referencedConnectorTypes,
+        Dictionary<string, TextSpan> referencedConnectorTypes,
         List<LspDiagnostic> diagnostics)
     {
+        // Infer the connector type once per invocation (used for CSDK102 and CSDK104).
+        string? invokedConnectorType = ConnectionConfigValidator.InferConnectorTypeFromInvocation(invocation);
+        if (invokedConnectorType is not null)
+        {
+            referencedConnectorTypes.TryAdd(invokedConnectorType, invocation.Expression.Span);
+        }
+
         // Look for connection parameters by name convention.
         foreach (ArgumentSyntax argument in invocation.ArgumentList.Arguments)
         {
@@ -118,13 +126,6 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             if (parameterName is null || !ConnectionConfigValidator.IsConnectionParameterName(parameterName))
             {
                 continue;
-            }
-
-            // Extract the connector type from the containing member access.
-            string? connectorType = ConnectionConfigValidator.InferConnectorTypeFromInvocation(invocation);
-            if (connectorType is not null)
-            {
-                referencedConnectorTypes.Add(connectorType);
             }
 
             // Only validate string literal arguments — variables, method calls, etc. are not statically analyzable.
@@ -161,14 +162,13 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
             }
 
             // CSDK105: Connection type mismatch.
-            if (connectorType is not null && !string.IsNullOrEmpty(connectionValue))
+            if (invokedConnectorType is not null && !string.IsNullOrEmpty(connectionValue))
             {
-                this.ValidateConnectionTypeMismatch(connectionValue, connectorType, valueRange, connections, diagnostics);
+                this.ValidateConnectionTypeMismatch(connectionValue, invokedConnectorType, valueRange, connections, diagnostics);
             }
         }
 
         // CSDK104: Multiple connections match the connector type.
-        string? invokedConnectorType = ConnectionConfigValidator.InferConnectorTypeFromInvocation(invocation);
         if (invokedConnectorType is not null)
         {
             List<string> matchingConnections = ConnectionsHelper
@@ -207,7 +207,7 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         AttributeSyntax attribute,
         SourceText sourceText,
         ConnectionsConfig connections,
-        HashSet<string> referencedConnectorTypes,
+        Dictionary<string, TextSpan> referencedConnectorTypes,
         List<LspDiagnostic> diagnostics)
     {
         string attributeName = ConnectionConfigValidator.ExtractRightmostIdentifier(attribute.Name.ToString());
@@ -221,7 +221,9 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
         string? connectorType = ConnectionConfigValidator.ExtractNamedArgumentValue(attribute, "ConnectorName");
         if (connectorType is not null)
         {
-            referencedConnectorTypes.Add(connectorType);
+            AttributeArgumentSyntax? connectorNameArg = ConnectionConfigValidator.FindNamedArgument(attribute, "ConnectorName");
+            TextSpan span = connectorNameArg?.Expression.Span ?? attribute.Name.Span;
+            referencedConnectorTypes.TryAdd(connectorType, span);
 
             // CSDK104: Multiple connections for this connector type.
             List<string> matchingConnections = ConnectionsHelper
@@ -230,7 +232,6 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
 
             if (matchingConnections.Count > 1)
             {
-                AttributeArgumentSyntax? connectorNameArg = ConnectionConfigValidator.FindNamedArgument(attribute, "ConnectorName");
                 if (connectorNameArg is not null)
                 {
                     diagnostics.Add(ConnectionConfigValidator.CreateDiagnostic(

@@ -589,6 +589,42 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_InvocationWithNoConnectionForConnector_EmitsCSdk102()
+    {
+        // Arrange — no teams connection configured, connector type inferred from invocation receiver
+        var connectionsService = new ConnectionsService();
+        connectionsService.UpdateConnections(ConnectionConfigValidatorTests.CreateOffice365Connections());
+        var validator = new ConnectionConfigValidator(connectionsService);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            class TeamsClient
+            {
+                public void SendMessage() { }
+            }
+            class Test
+            {
+                public void MyMethod()
+                {
+                    var teamsClient = new TeamsClient();
+                    teamsClient.SendMessage();
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? noConnection = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.NoConnectionConfigured, StringComparison.Ordinal));
+        Assert.IsNotNull(noConnection, message: "Expected CSDK102 for connector type inferred from invocation with no configured connection.");
+        Assert.AreEqual(DiagnosticSeverity.Error, noConnection.Severity);
+        Assert.IsTrue(noConnection.Message.Contains("teams", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_NonSdkAttribute_NoDiagnostics()
     {
         // Arrange — custom attribute should not trigger connection diagnostics
