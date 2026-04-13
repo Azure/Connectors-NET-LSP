@@ -50,7 +50,23 @@ internal static class DiagnosticCodes
     // CSDK100–CSDK199: Connection configuration
     // ---------------------------------------------------------------
 
-    // (reserved for future validators)
+    /// <summary>Connection parameter value does not match any configured connection.</summary>
+    public const string ConnectionParameterValueInvalid = "CSDK100";
+
+    /// <summary>Connection parameter uses a hard-coded string instead of a configuration reference.</summary>
+    public const string ConnectionParameterHardCoded = "CSDK101";
+
+    /// <summary>No connection configuration found for a connector that is used in this file.</summary>
+    public const string NoConnectionConfigured = "CSDK102";
+
+    /// <summary>Connection name referenced in code is missing from the connections configuration.</summary>
+    public const string ConnectionMissing = "CSDK103";
+
+    /// <summary>Multiple connections match a connector type, making auto-resolution ambiguous.</summary>
+    public const string MultipleConnectionsAmbiguous = "CSDK104";
+
+    /// <summary>Connection type does not match the connector type expected by the code context.</summary>
+    public const string ConnectionTypeMismatch = "CSDK105";
 
     // ---------------------------------------------------------------
     // CSDK200–CSDK299: Trigger payload types
