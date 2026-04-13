@@ -336,26 +336,55 @@ internal sealed class ConnectionConfigValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Infers the connector type from a method invocation by examining the member-access receiver identifier text.
-    /// For example: <c>office365Client.GetEmailAsync(...)</c> uses <c>office365Client</c> to infer "office365".
+    /// Infers the connector type from a method invocation by examining the member-access receiver expression.
+    /// For example: <c>office365Client.GetEmailAsync(...)</c> uses <c>office365Client</c> and
+    /// <c>new TeamsClient().SendMessage()</c> uses <c>TeamsClient</c> to infer the connector type.
     /// </summary>
     private static string? InferConnectorTypeFromInvocation(InvocationExpressionSyntax invocation)
     {
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
-            // Extract just the rightmost identifier from the receiver to handle
-            // qualifiers like "this.office365Client" or "foo.office365Client".
-            string receiverIdentifier = memberAccess.Expression switch
+            string? receiverIdentifier = ConnectionConfigValidator.TryGetReceiverIdentifier(memberAccess.Expression);
+            if (!string.IsNullOrEmpty(receiverIdentifier))
             {
-                MemberAccessExpressionSyntax nestedAccess => nestedAccess.Name.Identifier.Text,
-                IdentifierNameSyntax identifier => identifier.Identifier.Text,
-                _ => memberAccess.Expression.ToString(),
-            };
-
-            return DynamicValuesHelper.InferConnectorFromContainingType(receiverIdentifier);
+                return DynamicValuesHelper.InferConnectorFromContainingType(receiverIdentifier);
+            }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Tries to extract the most useful identifier text from a receiver expression for connector inference.
+    /// Handles simple identifiers, member access, object creation, parenthesized, and conditional access.
+    /// </summary>
+    private static string? TryGetReceiverIdentifier(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            MemberAccessExpressionSyntax nestedAccess => nestedAccess.Name.Identifier.Text,
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            ObjectCreationExpressionSyntax objectCreation => ConnectionConfigValidator.TryGetTypeIdentifier(objectCreation.Type),
+            ParenthesizedExpressionSyntax parenthesized => ConnectionConfigValidator.TryGetReceiverIdentifier(parenthesized.Expression),
+            ConditionalAccessExpressionSyntax conditionalAccess => ConnectionConfigValidator.TryGetReceiverIdentifier(conditionalAccess.Expression),
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// Tries to extract the rightmost type identifier from a type syntax node.
+    /// </summary>
+    private static string? TryGetTypeIdentifier(TypeSyntax typeSyntax)
+    {
+        return typeSyntax switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            GenericNameSyntax genericName => genericName.Identifier.Text,
+            QualifiedNameSyntax qualifiedName => ConnectionConfigValidator.TryGetTypeIdentifier(qualifiedName.Right),
+            AliasQualifiedNameSyntax aliasQualifiedName => aliasQualifiedName.Name.Identifier.Text,
+            NullableTypeSyntax nullableType => ConnectionConfigValidator.TryGetTypeIdentifier(nullableType.ElementType),
+            _ => typeSyntax.ToString(),
+        };
     }
 
     /// <summary>

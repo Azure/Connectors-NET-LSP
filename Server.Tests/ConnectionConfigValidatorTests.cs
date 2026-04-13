@@ -441,6 +441,41 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_InvocationMultipleConnections_EmitsCSdk104()
+    {
+        // Arrange — multiple office365 connections, invocation with no explicit connection arg
+        var connectionsService = new ConnectionsService();
+        connectionsService.UpdateConnections(ConnectionConfigValidatorTests.CreateMultipleOffice365Connections());
+        var validator = new ConnectionConfigValidator(connectionsService);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            class Office365Client
+            {
+                public void GetEmail() { }
+            }
+            class Test
+            {
+                public void MyMethod()
+                {
+                    var office365Client = new Office365Client();
+                    office365Client.GetEmail();
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? ambiguous = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.MultipleConnectionsAmbiguous, StringComparison.Ordinal));
+        Assert.IsNotNull(ambiguous, message: "Expected CSDK104 for invocation with multiple matching connections.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, ambiguous.Severity);
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_ConnectionTypeMismatch_EmitsCSdk105()
     {
         // Arrange — SharePoint connection used where office365 expected
@@ -516,6 +551,43 @@ public class ConnectionConfigValidatorTests
         Diagnostic? mismatch = diagnostics.FirstOrDefault(diagnostic =>
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionTypeMismatch, StringComparison.Ordinal));
         Assert.IsNull(mismatch, message: "Should not emit CSDK105 when connection type matches.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_InvocationConnectionTypeMismatch_EmitsCSdk105()
+    {
+        // Arrange — SharePoint connection used in invocation where office365 is expected
+        var connectionsService = new ConnectionsService();
+        connectionsService.UpdateConnections(ConnectionConfigValidatorTests.CreateSharePointConnections());
+        var validator = new ConnectionConfigValidator(connectionsService);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            class Office365Client
+            {
+                public void GetEmail(string connectionName) { }
+            }
+            class Test
+            {
+                public void MyMethod()
+                {
+                    var office365Client = new Office365Client();
+                    office365Client.GetEmail(connectionName: "sp-conn");
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? mismatch = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionTypeMismatch, StringComparison.Ordinal));
+        Assert.IsNotNull(mismatch, message: "Expected CSDK105 for invocation with connection type mismatch.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, mismatch.Severity);
+        Assert.IsTrue(mismatch.Message.Contains("sharepointonline", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
