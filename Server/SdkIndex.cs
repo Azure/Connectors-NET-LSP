@@ -41,15 +41,15 @@ public sealed class SdkIndex
     /// type names for O(1) existence checks. Built once per SdkIndex instance
     /// and reused across all validator invocations.
     /// </summary>
-    private HashSet<string>? typeNameLookupCache;
+    private volatile IReadOnlySet<string>? typeNameLookupCache;
 
     /// <summary>
-    /// Gets a pre-computed lookup set of type names for fast existence checks.
+    /// Gets a pre-computed read-only lookup set of type names for fast existence checks.
     /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
     /// and simple names (e.g., "Office365OnNewEmailTriggerPayload").
-    /// Thread-safe: built lazily on first access.
+    /// Thread-safe: uses volatile field with idempotent initialization.
     /// </summary>
-    public HashSet<string> TypeNameLookup
+    public IReadOnlySet<string> TypeNameLookup
     {
         get
         {
