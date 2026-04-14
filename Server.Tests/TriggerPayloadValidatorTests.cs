@@ -442,6 +442,7 @@ public class TriggerPayloadValidatorTests
         Assert.IsNotNull(notPayload, message: "Expected CSDK204 for non-payload type.");
         Assert.AreEqual(DiagnosticSeverity.Warning, notPayload.Severity);
         Assert.IsTrue(notPayload.Message.Contains("GraphClientReceiveMessage", StringComparison.Ordinal));
+        Assert.IsTrue(notPayload.Message.Contains("naming convention", StringComparison.Ordinal));
         Assert.IsTrue(notPayload.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 

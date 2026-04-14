@@ -13,7 +13,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
-using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace SdkLspServer.Diagnostics.Validators;
@@ -116,7 +115,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return;
         }
 
-        string? expectedPayloadType = sdkIndex.GetPayloadTypeForOperation(triggerInfo.ConnectorNameValue, triggerInfo.OperationName);
+        // Normalize operation name to canonical form (case-insensitive match)
+        // to avoid false CSDK203 when operation name has valid but different casing.
+        string canonicalOperationName = TriggerPayloadValidator.ResolveCanonicalOperationName(
+            triggerInfo.OperationName,
+            triggerInfo.ConnectorNameValue,
+            sdkIndex) ?? triggerInfo.OperationName;
+
+        string? expectedPayloadType = sdkIndex.GetPayloadTypeForOperation(triggerInfo.ConnectorNameValue, canonicalOperationName);
 
         this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, expectedPayloadType, triggerInfo, sourceText, sdkIndex, diagnostics);
     }
@@ -133,7 +139,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         SdkIndex sdkIndex,
         List<LspDiagnostic> diagnostics)
     {
-        LspRange typeRange = TriggerPayloadValidator.ToLspRange(typeArgument.Span, sourceText);
+        LspRange typeRange = ValidatorHelpers.ToLspRange(typeArgument.Span, sourceText);
 
         // CSDK201: Weak type when a typed payload exists
         if (TriggerPayloadValidator.WeakTypeNames.Contains(simpleTypeName))
@@ -141,7 +147,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             if (expectedPayloadType is not null)
             {
                 string expectedSimpleName = TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType);
-                diagnostics.Add(TriggerPayloadValidator.CreateDiagnostic(
+                diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
                     typeRange,
                     LspDiagnosticSeverity.Warning,
                     DiagnosticCodes.TriggerPayloadWeakType,
@@ -158,7 +164,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             string suggestion = expectedPayloadType is not null
                 ? $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'."
                 : string.Empty;
-            diagnostics.Add(TriggerPayloadValidator.CreateDiagnostic(
+            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
                 typeRange,
                 LspDiagnosticSeverity.Error,
                 DiagnosticCodes.TriggerPayloadTypeNotFound,
@@ -169,7 +175,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // CSDK203: Operation does not map to a known payload type
         if (expectedPayloadType is null)
         {
-            diagnostics.Add(TriggerPayloadValidator.CreateDiagnostic(
+            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
                 typeRange,
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadOperationUnmapped,
@@ -184,19 +190,19 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return;
         }
 
-        // CSDK204: Type exists but is not a TriggerCallbackPayload subclass
+        // CSDK204: Type exists but does not follow the expected trigger payload naming convention
         if (!simpleTypeName.EndsWith("TriggerPayload", StringComparison.Ordinal))
         {
-            diagnostics.Add(TriggerPayloadValidator.CreateDiagnostic(
+            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
                 typeRange,
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadNotPayloadType,
-                $"Type '{simpleTypeName}' does not appear to be a TriggerCallbackPayload type. Use '{expectedSimple}' for operation '{triggerInfo.OperationName}'."));
+                $"Type '{simpleTypeName}' does not follow the expected trigger payload naming convention (name should end with 'TriggerPayload'). Use '{expectedSimple}' for operation '{triggerInfo.OperationName}'."));
             return;
         }
 
         // CSDK200: Type mismatch — wrong payload type for this operation
-        diagnostics.Add(TriggerPayloadValidator.CreateDiagnostic(
+        diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
             typeRange,
             LspDiagnosticSeverity.Error,
             DiagnosticCodes.TriggerPayloadTypeMismatch,
@@ -263,21 +269,21 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             foreach (AttributeSyntax attribute in attributeList.Attributes)
             {
                 string attributeName = attribute.Name.ToString();
-                if (!TriggerPayloadValidator.IsTriggerMetadataAttribute(attributeName))
+                if (!ValidatorHelpers.IsTriggerMetadataAttribute(attributeName))
                 {
                     continue;
                 }
 
-                AttributeArgumentSyntax? connectorNameArgument = TriggerPayloadValidator.FindNamedArgument(attribute, "ConnectorName");
-                AttributeArgumentSyntax? operationNameArgument = TriggerPayloadValidator.FindNamedArgument(attribute, "OperationName");
+                AttributeArgumentSyntax? connectorNameArgument = ValidatorHelpers.FindNamedArgument(attribute, "ConnectorName");
+                AttributeArgumentSyntax? operationNameArgument = ValidatorHelpers.FindNamedArgument(attribute, "OperationName");
 
                 if (connectorNameArgument is null || operationNameArgument is null)
                 {
                     return null;
                 }
 
-                string? connectorNameText = TriggerPayloadValidator.ExtractStringValue(connectorNameArgument);
-                string? operationNameText = TriggerPayloadValidator.ExtractStringValue(operationNameArgument);
+                string? connectorNameText = ValidatorHelpers.ExtractStringValue(connectorNameArgument);
+                string? operationNameText = ValidatorHelpers.ExtractStringValue(operationNameArgument);
 
                 if (connectorNameText is null || operationNameText is null)
                 {
@@ -325,6 +331,22 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     }
 
     /// <summary>
+    /// Resolves an operation name to its canonical form (FieldName) using a case-insensitive
+    /// lookup against the SDK index. This ensures that <c>GetPayloadTypeForOperation</c>
+    /// (which is case-sensitive) receives the correct casing.
+    /// </summary>
+    private static string? ResolveCanonicalOperationName(string operationNameText, string connectorNameValue, SdkIndex sdkIndex)
+    {
+        ImmutableArray<SdkConstant> operations = sdkIndex.GetTriggerOperations(connectorNameValue);
+
+        SdkConstant? match = operations.FirstOrDefault(operation =>
+            string.Equals(operation.FieldName, operationNameText, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(operation.Value, operationNameText, StringComparison.OrdinalIgnoreCase));
+
+        return match?.FieldName;
+    }
+
+    /// <summary>
     /// Checks whether a simple type name exists in the SDK index type list.
     /// </summary>
     private static bool TypeExistsInIndex(string simpleTypeName, SdkIndex sdkIndex)
@@ -343,107 +365,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     {
         int lastDot = fullTypeName.LastIndexOf('.');
         return lastDot >= 0 ? fullTypeName.Substring(lastDot + 1) : fullTypeName;
-    }
-
-    /// <summary>
-    /// Determines whether the attribute name matches [ConnectorTriggerMetadata] or [ConnectorTrigger].
-    /// </summary>
-    private static bool IsTriggerMetadataAttribute(string attributeName)
-    {
-        string identifier = TriggerPayloadValidator.ExtractRightmostIdentifier(attributeName);
-        return string.Equals(identifier, "ConnectorTriggerMetadata", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTriggerMetadataAttribute", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTrigger", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTriggerAttribute", StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Extracts the rightmost identifier from a potentially qualified attribute name.
-    /// </summary>
-    private static string ExtractRightmostIdentifier(string attributeName)
-    {
-        int lastDot = attributeName.LastIndexOf('.');
-        int lastAliasQualifier = attributeName.LastIndexOf("::", StringComparison.Ordinal);
-
-        int afterDot = lastDot >= 0 ? lastDot + 1 : 0;
-        int afterAlias = lastAliasQualifier >= 0 ? lastAliasQualifier + 2 : 0;
-        int identifierStartIndex = Math.Max(afterDot, afterAlias);
-
-        return identifierStartIndex > 0
-            ? attributeName.Substring(identifierStartIndex)
-            : attributeName;
-    }
-
-    /// <summary>
-    /// Finds a named argument in an attribute by parameter name.
-    /// </summary>
-    private static AttributeArgumentSyntax? FindNamedArgument(AttributeSyntax attribute, string parameterName)
-    {
-        if (attribute.ArgumentList is null)
-        {
-            return null;
-        }
-
-        return attribute.ArgumentList.Arguments.FirstOrDefault(argument =>
-            argument.NameEquals is not null &&
-            string.Equals(argument.NameEquals.Name.Identifier.Text, parameterName, StringComparison.Ordinal));
-    }
-
-    /// <summary>
-    /// Extracts the string value from an attribute argument expression.
-    /// Supports string literals and member access expressions.
-    /// </summary>
-    private static string? ExtractStringValue(AttributeArgumentSyntax argument)
-    {
-        if (argument.Expression is LiteralExpressionSyntax literal &&
-            literal.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            return literal.Token.ValueText;
-        }
-
-        if (argument.Expression is MemberAccessExpressionSyntax memberAccess)
-        {
-            return memberAccess.Name.Identifier.Text;
-        }
-
-        if (argument.Expression is IdentifierNameSyntax identifier)
-        {
-            return identifier.Identifier.Text;
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Converts a Roslyn <see cref="TextSpan"/> to an LSP <see cref="LspRange"/>.
-    /// </summary>
-    private static LspRange ToLspRange(TextSpan span, SourceText sourceText)
-    {
-        LinePosition start = sourceText.Lines.GetLinePosition(span.Start);
-        LinePosition end = sourceText.Lines.GetLinePosition(span.End);
-
-        return new LspRange(
-            new LspPosition(start.Line, start.Character),
-            new LspPosition(end.Line, end.Character));
-    }
-
-    /// <summary>
-    /// Creates an LSP diagnostic with standard source.
-    /// </summary>
-    private static LspDiagnostic CreateDiagnostic(
-        LspRange range,
-        LspDiagnosticSeverity severity,
-        string code,
-        string message)
-    {
-        return new LspDiagnostic
-        {
-            Range = range,
-            Severity = severity,
-            Code = code,
-            Source = DiagnosticCodes.Source,
-            Message = message,
-        };
     }
 
     /// <summary>
