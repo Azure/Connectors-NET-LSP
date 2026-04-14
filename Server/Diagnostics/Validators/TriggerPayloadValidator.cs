@@ -69,10 +69,27 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
+        // Pre-compute a set of simple type names from the SDK index to avoid
+        // repeated linear scans in TypeExistsInIndex for each invocation.
+        var simpleTypeNameSet = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string fullTypeName in sdkIndex.TypeNames)
+        {
+            simpleTypeNameSet.Add(fullTypeName);
+            int lastDot = fullTypeName.LastIndexOf('.');
+            if (lastDot >= 0)
+            {
+                simpleTypeNameSet.Add(fullTypeName.Substring(lastDot + 1));
+            }
+        }
+
+        // Cache resolved TriggerMetadataInfo per method to avoid re-scanning
+        // attributes and SDK operation lists for each Deserialize<T> call.
+        var triggerMetadataCache = new Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?>();
+
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, diagnostics);
+            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, simpleTypeNameSet, triggerMetadataCache, diagnostics);
         }
 
         return diagnostics;
@@ -86,6 +103,8 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SourceText sourceText,
         SdkIndex sdkIndex,
+        HashSet<string> simpleTypeNameSet,
+        Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?> triggerMetadataCache,
         List<LspDiagnostic> diagnostics)
     {
         GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation);
@@ -109,7 +128,13 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return;
         }
 
-        TriggerMetadataInfo? triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(enclosingMethod, sdkIndex);
+        // Use cached trigger metadata to avoid re-scanning attributes per invocation
+        if (!triggerMetadataCache.TryGetValue(enclosingMethod, out TriggerMetadataInfo? triggerInfo))
+        {
+            triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(enclosingMethod, sdkIndex);
+            triggerMetadataCache[enclosingMethod] = triggerInfo;
+        }
+
         if (triggerInfo is null)
         {
             return;
@@ -124,7 +149,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         string? expectedPayloadType = sdkIndex.GetPayloadTypeForOperation(triggerInfo.ConnectorNameValue, canonicalOperationName);
 
-        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, expectedPayloadType, triggerInfo, sourceText, sdkIndex, diagnostics);
+        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, expectedPayloadType, triggerInfo, sourceText, simpleTypeNameSet, diagnostics);
     }
 
     /// <summary>
@@ -136,43 +161,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         string? expectedPayloadType,
         TriggerMetadataInfo triggerInfo,
         SourceText sourceText,
-        SdkIndex sdkIndex,
+        HashSet<string> simpleTypeNameSet,
         List<LspDiagnostic> diagnostics)
     {
         LspRange typeRange = ValidatorHelpers.ToLspRange(typeArgument.Span, sourceText);
 
-        // CSDK201: Weak type when a typed payload exists
-        if (TriggerPayloadValidator.WeakTypeNames.Contains(simpleTypeName))
-        {
-            if (expectedPayloadType is not null)
-            {
-                string expectedSimpleName = TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType);
-                diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
-                    typeRange,
-                    LspDiagnosticSeverity.Warning,
-                    DiagnosticCodes.TriggerPayloadWeakType,
-                    $"Deserialize<{simpleTypeName}> uses a weak type. Use the typed payload '{expectedSimpleName}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
-            }
-
-            return;
-        }
-
-        // CSDK202: Type not found in SDK type list
-        bool typeExists = TriggerPayloadValidator.TypeExistsInIndex(simpleTypeName, sdkIndex);
-        if (!typeExists)
-        {
-            string suggestion = expectedPayloadType is not null
-                ? $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'."
-                : string.Empty;
-            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
-                typeRange,
-                LspDiagnosticSeverity.Error,
-                DiagnosticCodes.TriggerPayloadTypeNotFound,
-                $"Type '{simpleTypeName}' is not found in the SDK type list.{suggestion}"));
-            return;
-        }
-
-        // CSDK203: Operation does not map to a known payload type
+        // CSDK203: Operation does not map to a known payload type.
+        // Check this before the weak-type check so that unmapped operations
+        // are always surfaced, even when T is a weak type like 'object'.
         if (expectedPayloadType is null)
         {
             diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
@@ -180,6 +176,30 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadOperationUnmapped,
                 $"Operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}' does not map to a known trigger payload type. Cannot verify Deserialize<{simpleTypeName}>."));
+            return;
+        }
+
+        // CSDK201: Weak type when a typed payload exists
+        if (TriggerPayloadValidator.WeakTypeNames.Contains(simpleTypeName))
+        {
+            string expectedSimpleName = TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType);
+            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
+                typeRange,
+                LspDiagnosticSeverity.Warning,
+                DiagnosticCodes.TriggerPayloadWeakType,
+                $"Deserialize<{simpleTypeName}> uses a weak type. Use the typed payload '{expectedSimpleName}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
+            return;
+        }
+
+        // CSDK202: Type not found in SDK type list (uses pre-computed HashSet)
+        if (!simpleTypeNameSet.Contains(simpleTypeName))
+        {
+            string suggestion = $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'.";
+            diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
+                typeRange,
+                LspDiagnosticSeverity.Error,
+                DiagnosticCodes.TriggerPayloadTypeNotFound,
+                $"Type '{simpleTypeName}' is not found in the SDK type list.{suggestion}"));
             return;
         }
 
@@ -344,16 +364,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             string.Equals(operation.Value, operationNameText, StringComparison.OrdinalIgnoreCase));
 
         return match?.FieldName;
-    }
-
-    /// <summary>
-    /// Checks whether a simple type name exists in the SDK index type list.
-    /// </summary>
-    private static bool TypeExistsInIndex(string simpleTypeName, SdkIndex sdkIndex)
-    {
-        return sdkIndex.TypeNames.Any(fullTypeName =>
-            string.Equals(fullTypeName, simpleTypeName, StringComparison.Ordinal) ||
-            fullTypeName.EndsWith("." + simpleTypeName, StringComparison.Ordinal));
     }
 
     /// <summary>

@@ -36,9 +36,11 @@ internal static class ValidatorHelpers
     }
 
     /// <summary>
-    /// Extracts the string value from an attribute argument expression.
-    /// Supports string literals (returns the literal value) and member access expressions
-    /// (returns the member name, e.g., "Office365" from ConnectorNames.Office365).
+    /// Extracts a syntactic text value from an attribute argument expression.
+    /// For string literals, returns the literal value. For member access expressions,
+    /// returns the rightmost identifier text (e.g., "Office365" from ConnectorNames.Office365).
+    /// For bare identifiers, returns the identifier text. This is a purely syntactic
+    /// extraction — no semantic constant evaluation is performed.
     /// </summary>
     public static string? ExtractStringValue(AttributeArgumentSyntax argument)
     {

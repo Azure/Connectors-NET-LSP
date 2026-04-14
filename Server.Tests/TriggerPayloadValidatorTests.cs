@@ -108,9 +108,11 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_NoDiagnostic()
+    public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_EmitsCSdk203()
     {
-        // Arrange — SharepointOnline includes the OnNewItem trigger operation, but the mock SdkIndex does not define a matching typed payload name for it.
+        // Arrange — SharepointOnline includes the OnNewItem trigger operation, but the mock SdkIndex
+        // does not define a matching typed payload name. CSDK203 should fire because the operation
+        // is unmapped, regardless of whether T is a weak type.
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
@@ -146,8 +148,11 @@ public class TriggerPayloadValidatorTests
             .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Assert
-        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for weak type when no typed payload exists.");
+        // Assert — CSDK203 fires because the operation has no mapped payload type
+        Diagnostic? unmapped = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadOperationUnmapped, StringComparison.Ordinal));
+        Assert.IsNotNull(unmapped, message: "Expected CSDK203 for unmapped operation even with weak type.");
+        Assert.AreEqual(DiagnosticSeverity.Warning, unmapped.Severity);
     }
 
     // ---------------------------------------------------------------
