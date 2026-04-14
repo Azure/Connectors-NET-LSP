@@ -30,7 +30,7 @@
     <PackageReference Include="System.Reflection.MetadataLoadContext" Version="9.0.14" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
-    <PackageReference Include="NuGet.Configuration" Version="6.14.0" />
+    <PackageReference Include="NuGet.Configuration" Version="7.3.0" />
     <PackageReference Include="NuGet.Packaging" Version="6.14.0" />
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
       <!-- SharpZipLib provides ZIP handling for NuGet packages -->
