@@ -69,21 +69,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Pre-compute a set of type names from the SDK index to avoid
-        // repeated linear scans for each invocation. Contains both fully-qualified
-        // names (e.g., "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload")
-        // and simple names (e.g., "Office365OnNewEmailTriggerPayload") for flexible lookup.
-        var typeNameLookup = new HashSet<string>(StringComparer.Ordinal);
-        foreach (string fullTypeName in sdkIndex.TypeNames)
-        {
-            typeNameLookup.Add(fullTypeName);
-            int lastDot = fullTypeName.LastIndexOf('.');
-            if (lastDot >= 0)
-            {
-                typeNameLookup.Add(fullTypeName.Substring(lastDot + 1));
-            }
-        }
-
         // Cache resolved TriggerMetadataInfo per method to avoid re-scanning
         // attributes and SDK operation lists for each Deserialize<T> call.
         var triggerMetadataCache = new Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?>();
@@ -91,7 +76,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, typeNameLookup, triggerMetadataCache, diagnostics);
+            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, triggerMetadataCache, diagnostics);
         }
 
         return diagnostics;
@@ -105,7 +90,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SourceText sourceText,
         SdkIndex sdkIndex,
-        HashSet<string> simpleTypeNameSet,
         Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?> triggerMetadataCache,
         List<LspDiagnostic> diagnostics)
     {
@@ -122,6 +106,12 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         TypeSyntax typeArgument = genericName.TypeArgumentList.Arguments[0];
         string simpleTypeName = TriggerPayloadValidator.GetSimpleTypeName(typeArgument);
+
+        // Use the full syntax text when the type argument is qualified (e.g., "Namespace.Type"),
+        // otherwise fall back to the simple name for unqualified identifiers.
+        string typeKey = typeArgument is QualifiedNameSyntax or AliasQualifiedNameSyntax
+            ? typeArgument.ToString()
+            : simpleTypeName;
 
         // Find the enclosing method and its [ConnectorTriggerMetadata] attribute
         MethodDeclarationSyntax? enclosingMethod = invocation.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
@@ -151,7 +141,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         string? expectedPayloadType = sdkIndex.GetPayloadTypeForOperation(triggerInfo.ConnectorNameValue, canonicalOperationName);
 
-        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, expectedPayloadType, triggerInfo, sourceText, simpleTypeNameSet, diagnostics);
+        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, typeKey, expectedPayloadType, triggerInfo, sourceText, sdkIndex, diagnostics);
     }
 
     /// <summary>
@@ -160,10 +150,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     private void EmitPayloadDiagnostic(
         TypeSyntax typeArgument,
         string simpleTypeName,
+        string typeKey,
         string? expectedPayloadType,
         TriggerMetadataInfo triggerInfo,
         SourceText sourceText,
-        HashSet<string> simpleTypeNameSet,
+        SdkIndex sdkIndex,
         List<LspDiagnostic> diagnostics)
     {
         LspRange typeRange = ValidatorHelpers.ToLspRange(typeArgument.Span, sourceText);
@@ -193,8 +184,9 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return;
         }
 
-        // CSDK202: Type not found in SDK type list (uses pre-computed HashSet)
-        if (!simpleTypeNameSet.Contains(simpleTypeName))
+        // CSDK202: Type not found in SDK type list (uses SdkIndex.TypeNameLookup).
+        // Check both the typeKey (which may be fully-qualified) and simple name.
+        if (!sdkIndex.TypeNameLookup.Contains(typeKey) && !sdkIndex.TypeNameLookup.Contains(simpleTypeName))
         {
             string suggestion = $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'.";
             diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
@@ -205,9 +197,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return;
         }
 
-        // Check if T matches the expected payload type
+        // Check if T matches the expected payload type.
+        // Compare both fully-qualified (typeKey vs expectedPayloadType) and simple names.
         string expectedSimple = TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType);
-        if (string.Equals(simpleTypeName, expectedSimple, StringComparison.Ordinal))
+        if (string.Equals(typeKey, expectedPayloadType, StringComparison.Ordinal) ||
+            string.Equals(simpleTypeName, expectedSimple, StringComparison.Ordinal))
         {
             return;
         }

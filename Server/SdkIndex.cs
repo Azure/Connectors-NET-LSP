@@ -36,6 +36,43 @@ public sealed class SdkIndex
     /// <summary>Gets a human‑readable summary describing how many assemblies and types were loaded.</summary>
     public string Summary => $"{AssemblyPaths.Length} assemblies, {TypeNames.Length} types";
 
+    /// <summary>
+    /// Lazily-initialized lookup set containing both fully-qualified and simple
+    /// type names for O(1) existence checks. Built once per SdkIndex instance
+    /// and reused across all validator invocations.
+    /// </summary>
+    private HashSet<string>? typeNameLookupCache;
+
+    /// <summary>
+    /// Gets a pre-computed lookup set of type names for fast existence checks.
+    /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
+    /// and simple names (e.g., "Office365OnNewEmailTriggerPayload").
+    /// Thread-safe: built lazily on first access.
+    /// </summary>
+    public HashSet<string> TypeNameLookup
+    {
+        get
+        {
+            if (this.typeNameLookupCache is null)
+            {
+                var lookup = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string fullTypeName in this.TypeNames)
+                {
+                    lookup.Add(fullTypeName);
+                    int lastDot = fullTypeName.LastIndexOf('.');
+                    if (lastDot >= 0)
+                    {
+                        lookup.Add(fullTypeName.Substring(lastDot + 1));
+                    }
+                }
+
+                this.typeNameLookupCache = lookup;
+            }
+
+            return this.typeNameLookupCache;
+        }
+    }
+
     private SdkIndex(
         string source,
         string root,

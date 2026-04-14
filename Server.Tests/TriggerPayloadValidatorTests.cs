@@ -725,4 +725,74 @@ public class TriggerPayloadValidatorTests
         // Assert — no CSDK203 because casing should be normalized to canonical form
         Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected when operation name casing differs but resolves correctly.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_FullyQualifiedCorrectType_NoDiagnostic()
+    {
+        // Arrange — fully-qualified type argument should match the expected payload type
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostic expected for fully-qualified correct payload type.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_FullyQualifiedWeakType_EmitsCSdk201()
+    {
+        // Arrange — fully-qualified weak type (System.Text.Json.JsonElement)
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<System.Text.Json.JsonElement>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for fully-qualified JsonElement.");
+    }
 }
