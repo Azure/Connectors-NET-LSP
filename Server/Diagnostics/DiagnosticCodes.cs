@@ -84,7 +84,7 @@ internal static class DiagnosticCodes
     /// <summary>Operation name in [ConnectorTriggerMetadata] does not map to a known trigger payload type.</summary>
     public const string TriggerPayloadOperationUnmapped = "CSDK203";
 
-    /// <summary>Type used in Deserialize&lt;T&gt; does not follow the TriggerCallbackPayload naming convention.</summary>
+    /// <summary>Type used in Deserialize&lt;T&gt; does not follow the TriggerPayload naming convention.</summary>
     public const string TriggerPayloadNotPayloadType = "CSDK204";
 
     // ---------------------------------------------------------------

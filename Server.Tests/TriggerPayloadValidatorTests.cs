@@ -110,7 +110,7 @@ public class TriggerPayloadValidatorTests
     [TestMethod]
     public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_NoDiagnostic()
     {
-        // Arrange — SharepointOnline has no trigger operations, so no expected payload
+        // Arrange — SharepointOnline includes the OnNewItem trigger operation, but the mock SdkIndex does not define a matching typed payload name for it.
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
@@ -404,7 +404,7 @@ public class TriggerPayloadValidatorTests
     }
 
     // ---------------------------------------------------------------
-    // CSDK204: Type is not a TriggerCallbackPayload subclass
+    // CSDK204: Type name does not follow the *TriggerPayload naming convention
     // ---------------------------------------------------------------
     [TestMethod]
     public async Task ValidateAsync_NonPayloadType_EmitsCSdk204()
