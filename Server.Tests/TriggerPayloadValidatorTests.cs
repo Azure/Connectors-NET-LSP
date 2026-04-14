@@ -690,4 +690,39 @@ public class TriggerPayloadValidatorTests
         // Assert
         Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected for non-deserialization generic methods.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_OperationNameDifferentCasing_ResolvesCorrectly()
+    {
+        // Arrange — operation name uses different casing than the canonical FieldName.
+        // The validator should normalize it and still find the expected payload type.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "onnewemail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Office365OnNewEmailTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — no CSDK203 because casing should be normalized to canonical form
+        Assert.AreEqual(0, diagnostics.Count, message: "No diagnostics expected when operation name casing differs but resolves correctly.");
+    }
 }

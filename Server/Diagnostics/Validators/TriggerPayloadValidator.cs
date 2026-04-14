@@ -69,16 +69,18 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Pre-compute a set of simple type names from the SDK index to avoid
-        // repeated linear scans in TypeExistsInIndex for each invocation.
-        var simpleTypeNameSet = new HashSet<string>(StringComparer.Ordinal);
+        // Pre-compute a set of type names from the SDK index to avoid
+        // repeated linear scans for each invocation. Contains both fully-qualified
+        // names (e.g., "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload")
+        // and simple names (e.g., "Office365OnNewEmailTriggerPayload") for flexible lookup.
+        var typeNameLookup = new HashSet<string>(StringComparer.Ordinal);
         foreach (string fullTypeName in sdkIndex.TypeNames)
         {
-            simpleTypeNameSet.Add(fullTypeName);
+            typeNameLookup.Add(fullTypeName);
             int lastDot = fullTypeName.LastIndexOf('.');
             if (lastDot >= 0)
             {
-                simpleTypeNameSet.Add(fullTypeName.Substring(lastDot + 1));
+                typeNameLookup.Add(fullTypeName.Substring(lastDot + 1));
             }
         }
 
@@ -89,7 +91,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, simpleTypeNameSet, triggerMetadataCache, diagnostics);
+            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, typeNameLookup, triggerMetadataCache, diagnostics);
         }
 
         return diagnostics;
