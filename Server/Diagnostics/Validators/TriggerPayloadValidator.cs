@@ -47,9 +47,17 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     };
 
     /// <summary>
+    /// Maps known serializer type names to their expected namespace prefix.
+    /// Used to validate that a simple receiver name corresponds to the correct namespace import.
+    /// </summary>
+    private static readonly Dictionary<string, string> SerializerTypeToNamespace = new(StringComparer.Ordinal)
+    {
+        ["JsonSerializer"] = "System.Text.Json",
+        ["JsonConvert"] = "Newtonsoft.Json",
+    };
+
+    /// <summary>
     /// Known namespace prefixes that contain serializer types.
-    /// Used with <see cref="KnownSerializerTypeNames"/> to validate that a simple receiver
-    /// name matches one of these namespaces via a using directive.
     /// </summary>
     private static readonly HashSet<string> KnownSerializerNamespaces = new(StringComparer.Ordinal)
     {
@@ -90,13 +98,18 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Check if the file imports known serializer namespaces (e.g., using System.Text.Json).
-        // This is used to gate simple-name receiver matching and reduce false positives from
-        // user-defined types named JsonSerializer or JsonConvert.
-        bool hasSerializerNamespaceImport = root.Usings.Any(usingDirective =>
-            !usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
-            usingDirective.Name is not null &&
-            TriggerPayloadValidator.IsKnownSerializerNamespace(usingDirective.Name.ToString()));
+        // Collect imported namespace names to validate serializer receiver types.
+        // Each serializer type (JsonSerializer, JsonConvert) is only accepted when
+        // its specific namespace (System.Text.Json, Newtonsoft.Json) is imported.
+        var importedNamespaces = new HashSet<string>(StringComparer.Ordinal);
+        foreach (UsingDirectiveSyntax usingDirective in root.Usings)
+        {
+            if (!usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
+                usingDirective.Name is not null)
+            {
+                importedNamespaces.Add(usingDirective.Name.ToString());
+            }
+        }
 
         // Check if the file contains a using static directive for a known serializer type
         // (e.g., using static System.Text.Json.JsonSerializer). If so, bare Deserialize<T>()
@@ -125,7 +138,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             foreach (InvocationExpressionSyntax invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, hasSerializerNamespaceImport, triggerInfo, diagnostics);
+                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, importedNamespaces, triggerInfo, diagnostics);
             }
         }
 
@@ -141,11 +154,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         SourceText sourceText,
         SdkIndex sdkIndex,
         bool hasStaticSerializerImport,
-        bool hasSerializerNamespaceImport,
+        HashSet<string> importedNamespaces,
         TriggerMetadataInfo triggerInfo,
         List<LspDiagnostic> diagnostics)
     {
-        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport, hasSerializerNamespaceImport);
+        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport, importedNamespaces);
         if (genericName is null)
         {
             return;
@@ -294,7 +307,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// Returns null if the invocation is not a recognized deserialization method or the receiver
     /// is not a known serializer type.
     /// </summary>
-    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport, bool hasSerializerNamespaceImport)
+    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport, HashSet<string> importedNamespaces)
     {
         GenericNameSyntax? genericName = null;
         string? receiverName = null;
@@ -347,7 +360,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         {
             // Check if the receiver is a known serializer by simple name + namespace import
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
-                                       hasSerializerNamespaceImport;
+                                       TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
+                                       importedNamespaces.Any(ns =>
+                                           string.Equals(ns, expectedNamespace, StringComparison.Ordinal) ||
+                                           ns.StartsWith(expectedNamespace + ".", StringComparison.Ordinal));
 
             // Check if the full receiver expression is a fully-qualified known serializer
             bool isFullyQualified = false;
@@ -397,7 +413,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// <summary>
     /// Normalizes a <see cref="QualifiedNameSyntax"/> by stripping any <c>global::</c>
     /// alias prefix from its leftmost part. For <c>global::A.B.C</c> returns <c>"A.B.C"</c>.
-    /// Walks the left chain recursively to handle deeply nested qualified names.
+    /// Strips the <c>global::</c> prefix from the string representation if present.
     /// For normal qualified names without alias, returns <c>ToString()</c>.
     /// </summary>
     private static string NormalizeQualifiedName(QualifiedNameSyntax qualified)
