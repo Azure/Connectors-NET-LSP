@@ -127,15 +127,21 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         TypeSyntax typeArgument = genericName.TypeArgumentList.Arguments[0];
         string simpleTypeName = TriggerPayloadValidator.GetSimpleTypeName(typeArgument);
 
+        // Unwrap NullableTypeSyntax (e.g., "Namespace.Type?") to get the inner type
+        // for qualification checks, since the nullable wrapper hides the qualified form.
+        TypeSyntax unwrappedType = typeArgument is NullableTypeSyntax nullable
+            ? nullable.ElementType
+            : typeArgument;
+
         // Use the full syntax text when the type argument is qualified (e.g., "Namespace.Type"),
         // otherwise fall back to the simple name for unqualified identifiers.
         // Normalize alias-qualified names (e.g., "global::Namespace.Type") by stripping
         // the alias prefix so the key matches SDK index entries.
-        bool isQualifiedType = typeArgument is QualifiedNameSyntax or AliasQualifiedNameSyntax;
-        string typeKey = typeArgument switch
+        bool isQualifiedType = unwrappedType is QualifiedNameSyntax or AliasQualifiedNameSyntax;
+        string typeKey = unwrappedType switch
         {
             AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name.ToString(),
-            QualifiedNameSyntax qualified => qualified.ToString(),
+            QualifiedNameSyntax qualified => TriggerPayloadValidator.NormalizeQualifiedName(qualified),
             _ => simpleTypeName,
         };
 
@@ -341,6 +347,22 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name.Identifier.Text,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Normalizes a <see cref="QualifiedNameSyntax"/> by stripping any <c>global::</c>
+    /// alias prefix from its leftmost part. For <c>global::Namespace.Type</c> returns
+    /// <c>"Namespace.Type"</c>. For normal qualified names, returns <c>ToString()</c>.
+    /// </summary>
+    private static string NormalizeQualifiedName(QualifiedNameSyntax qualified)
+    {
+        // If the leftmost part is an AliasQualifiedNameSyntax (global::...), strip it
+        if (qualified.Left is AliasQualifiedNameSyntax aliasLeft)
+        {
+            return aliasLeft.Name + "." + qualified.Right;
+        }
+
+        return qualified.ToString();
     }
 
     /// <summary>
