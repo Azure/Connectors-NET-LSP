@@ -875,6 +875,42 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_LocalVariableShadowsSerializer_NoDiagnostic()
+    {
+        // Arrange — a local variable named "JsonSerializer" shadows the imported type.
+        // The validator should not treat it as a known serializer receiver.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var JsonSerializer = new MyCustomSerializer();
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — no diagnostics because local variable shadows the imported serializer
+        Assert.AreEqual(0, diagnostics.Count, message: "Local variable shadows the imported serializer; should not emit diagnostics.");
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_AliasUsingDirective_NoDiagnostic()
     {
         // Arrange — alias directive "using STJ = System.Text.Json;" does not bring

@@ -101,6 +101,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // Collect all using directives from the compilation unit — both top-level
         // (root.Usings) and namespace-scoped (e.g., inside NamespaceDeclarationSyntax
         // or FileScopedNamespaceDeclarationSyntax). Both forms bring types into scope.
+        // NOTE: In multi-namespace files, a using inside one namespace does not apply
+        // to code in other namespaces. We aggregate all usings as a simplification;
+        // per-method scoping would be needed for strict correctness in multi-namespace
+        // files, but those are extremely rare in Azure Functions projects.
         IEnumerable<UsingDirectiveSyntax> allUsings = root.Usings.AsEnumerable();
         foreach (BaseNamespaceDeclarationSyntax nsDecl in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
         {
@@ -374,16 +378,27 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         // Require a known serializer receiver for member access calls.
         // For simple-name receivers (e.g., "JsonSerializer"), require a matching namespace import
-        // and verify the name is not shadowed by a locally declared type.
+        // and verify the name is not shadowed by a locally declared type or local variable.
         // For fully-qualified receivers (e.g., "System.Text.Json.JsonSerializer"), accept directly.
         // Direct calls (receiverName is null) are allowed when hasStaticSerializerImport is true.
         if (receiverName is not null)
         {
             // Check if the receiver is a known serializer by simple name + namespace import.
             // Suppress the match when the compilation unit declares a type with the same name,
-            // since the local declaration shadows the imported serializer type.
+            // or when the containing method declares a local variable with that name
+            // (e.g., "var JsonSerializer = ...;"), since both shadow the imported type.
+            bool isShadowedByLocal = false;
+            if (TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
+                invocation.FirstAncestorOrSelf<BaseMethodDeclarationSyntax>() is { } containingMethod)
+            {
+                isShadowedByLocal = containingMethod.DescendantNodes()
+                    .OfType<VariableDeclaratorSyntax>()
+                    .Any(v => string.Equals(v.Identifier.Text, receiverName, StringComparison.Ordinal));
+            }
+
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
                                        !localTypeNames.Contains(receiverName) &&
+                                       !isShadowedByLocal &&
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
                                        importedNamespaces.Contains(expectedNamespace);
 
