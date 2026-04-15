@@ -92,10 +92,31 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             TriggerPayloadValidator.KnownSerializerTypeNames.Contains(
                 TriggerPayloadValidator.GetSimpleTypeName(usingDirective.Name)));
 
-        foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        // Iterate only methods with trigger metadata attributes to avoid walking
+        // every invocation in the entire file. This reduces per-keystroke cost
+        // in the LSP scenario for large files.
+        foreach (MethodDeclarationSyntax method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, triggerMetadataCache, diagnostics);
+
+            // Use cached trigger metadata — skip methods without trigger attributes
+            if (!triggerMetadataCache.TryGetValue(method, out TriggerMetadataInfo? triggerInfo))
+            {
+                triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(method, sdkIndex);
+                triggerMetadataCache[method] = triggerInfo;
+            }
+
+            if (triggerInfo is null)
+            {
+                continue;
+            }
+
+            // Only scan invocations within trigger-attributed methods
+            foreach (InvocationExpressionSyntax invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, triggerInfo, diagnostics);
+            }
         }
 
         return diagnostics;
@@ -103,14 +124,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
     /// <summary>
     /// Validates a single invocation expression, checking if it is a <c>Deserialize&lt;T&gt;</c>
-    /// call inside a method decorated with <c>[ConnectorTriggerMetadata]</c>.
+    /// call with the correct payload type for the trigger operation.
     /// </summary>
     private void ValidateDeserializeInvocation(
         InvocationExpressionSyntax invocation,
         SourceText sourceText,
         SdkIndex sdkIndex,
         bool hasStaticSerializerImport,
-        Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?> triggerMetadataCache,
+        TriggerMetadataInfo triggerInfo,
         List<LspDiagnostic> diagnostics)
     {
         GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport);
@@ -137,6 +158,9 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // otherwise fall back to the simple name for unqualified identifiers.
         // Normalize alias-qualified names (e.g., "global::Namespace.Type") by stripping
         // the alias prefix so the key matches SDK index entries.
+        // NOTE: For unqualified types, matching by simple name is a known limitation of
+        // syntax-only analysis — if the SDK contains same-named types in different namespaces,
+        // the match may be incorrect. Semantic model analysis would resolve this.
         bool isQualifiedType = unwrappedType is QualifiedNameSyntax or AliasQualifiedNameSyntax;
         string typeKey = unwrappedType switch
         {
@@ -144,25 +168,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             QualifiedNameSyntax qualified => TriggerPayloadValidator.NormalizeQualifiedName(qualified),
             _ => simpleTypeName,
         };
-
-        // Find the enclosing method and its [ConnectorTriggerMetadata] attribute
-        MethodDeclarationSyntax? enclosingMethod = invocation.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
-        if (enclosingMethod is null)
-        {
-            return;
-        }
-
-        // Use cached trigger metadata to avoid re-scanning attributes per invocation
-        if (!triggerMetadataCache.TryGetValue(enclosingMethod, out TriggerMetadataInfo? triggerInfo))
-        {
-            triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(enclosingMethod, sdkIndex);
-            triggerMetadataCache[enclosingMethod] = triggerInfo;
-        }
-
-        if (triggerInfo is null)
-        {
-            return;
-        }
 
         // Normalize operation name to canonical form (case-insensitive match)
         // to avoid false CSDK203 when operation name has valid but different casing.
