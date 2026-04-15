@@ -102,24 +102,18 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // Each serializer type (JsonSerializer, JsonConvert) is only accepted when
         // its specific namespace (System.Text.Json, Newtonsoft.Json) is imported.
         // Normalize global:: prefix so "using global::System.Text.Json;" matches "System.Text.Json".
+        // Exclude alias directives (e.g., "using STJ = System.Text.Json;") because they do not
+        // bring types into scope by simple name.
         var importedNamespaces = new HashSet<string>(StringComparer.Ordinal);
         foreach (UsingDirectiveSyntax usingDirective in root.Usings)
         {
             if (!usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
+                usingDirective.Alias is null &&
                 usingDirective.Name is not null)
             {
                 importedNamespaces.Add(TriggerPayloadValidator.NormalizeUsingName(usingDirective.Name.ToString()));
             }
         }
-
-        // Check if the file contains a using static directive for a known serializer type
-        // (e.g., using static System.Text.Json.JsonSerializer). Validates the full qualified type
-        // name to avoid false positives from user-defined types with the same simple name.
-        bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
-            usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
-            usingDirective.Name is not null &&
-            TriggerPayloadValidator.KnownFullyQualifiedSerializerTypes.Contains(
-                TriggerPayloadValidator.NormalizeUsingName(usingDirective.Name.ToString())));
 
         // Collect type names declared in this compilation unit. If the file declares
         // a class/struct named e.g. "JsonSerializer", it shadows the imported type and
@@ -127,6 +121,16 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         var localTypeNames = new HashSet<string>(
             root.DescendantNodes().OfType<TypeDeclarationSyntax>().Select(t => t.Identifier.Text),
             StringComparer.Ordinal);
+
+        // Check if the file contains a using static directive for a known serializer type.
+        // Accepts fully-qualified forms (e.g., "using static System.Text.Json.JsonSerializer;")
+        // and simple-name forms (e.g., "using static JsonSerializer;") when the corresponding
+        // namespace is imported and the name is not shadowed by a local type declaration.
+        bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
+            usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
+            usingDirective.Name is not null &&
+            TriggerPayloadValidator.IsKnownStaticSerializerImport(
+                usingDirective.Name, importedNamespaces, localTypeNames));
 
         // Iterate only methods with trigger metadata attributes to avoid walking
         // every invocation in the entire file. This reduces per-keystroke cost
@@ -424,6 +428,36 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         return usingName.StartsWith("global::", StringComparison.Ordinal)
             ? usingName.Substring("global::".Length)
             : usingName;
+    }
+
+    /// <summary>
+    /// Determines whether a <c>using static</c> directive name refers to a known serializer type.
+    /// Accepts both fully-qualified forms (e.g., <c>System.Text.Json.JsonSerializer</c>) and
+    /// simple-name forms (e.g., <c>JsonSerializer</c>) when the corresponding namespace is
+    /// already imported and the name is not shadowed by a local type declaration.
+    /// </summary>
+    private static bool IsKnownStaticSerializerImport(
+        NameSyntax name,
+        HashSet<string> importedNamespaces,
+        HashSet<string> localTypeNames)
+    {
+        string normalizedName = TriggerPayloadValidator.NormalizeUsingName(name.ToString());
+
+        // Fully-qualified form: "using static System.Text.Json.JsonSerializer;"
+        if (TriggerPayloadValidator.KnownFullyQualifiedSerializerTypes.Contains(normalizedName))
+        {
+            return true;
+        }
+
+        // Simple-name form: "using static JsonSerializer;" — only valid when
+        // the corresponding namespace is imported and not shadowed locally.
+        if (localTypeNames.Contains(normalizedName))
+        {
+            return false;
+        }
+
+        return TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(normalizedName, out string? expectedNamespace) &&
+               importedNamespaces.Contains(expectedNamespace);
     }
 
     /// <summary>

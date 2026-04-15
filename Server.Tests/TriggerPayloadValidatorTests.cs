@@ -875,6 +875,80 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_AliasUsingDirective_NoDiagnostic()
+    {
+        // Arrange — alias directive "using STJ = System.Text.Json;" does not bring
+        // JsonSerializer into scope by simple name. The validator should not treat
+        // JsonSerializer.Deserialize<T> as a known serializer in this case.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using STJ = System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — no diagnostics because alias using doesn't bring types into simple-name scope
+        Assert.AreEqual(0, diagnostics.Count, message: "Alias using directive should not enable serializer detection by simple name.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_SimpleNameUsingStatic_EmitsCSdk201()
+    {
+        // Arrange — "using System.Text.Json; using static JsonSerializer;" is valid C#
+        // because the namespace import makes JsonSerializer resolvable.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            using static JsonSerializer;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for bare Deserialize<object> with simple-name using static.");
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_UsingStaticDirectCall_EmitsCSdk201()
     {
         // Arrange — using static System.Text.Json.JsonSerializer enables bare Deserialize<T>() calls
