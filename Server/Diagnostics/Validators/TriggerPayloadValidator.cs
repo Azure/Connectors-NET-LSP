@@ -98,6 +98,15 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
+        // Collect all using directives from the compilation unit — both top-level
+        // (root.Usings) and namespace-scoped (e.g., inside NamespaceDeclarationSyntax
+        // or FileScopedNamespaceDeclarationSyntax). Both forms bring types into scope.
+        IEnumerable<UsingDirectiveSyntax> allUsings = root.Usings.AsEnumerable();
+        foreach (BaseNamespaceDeclarationSyntax nsDecl in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
+        {
+            allUsings = allUsings.Concat(nsDecl.Usings);
+        }
+
         // Collect imported namespace names to validate serializer receiver types.
         // Each serializer type (JsonSerializer, JsonConvert) is only accepted when
         // its specific namespace (System.Text.Json, Newtonsoft.Json) is imported.
@@ -105,7 +114,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // Exclude alias directives (e.g., "using STJ = System.Text.Json;") because they do not
         // bring types into scope by simple name.
         var importedNamespaces = new HashSet<string>(StringComparer.Ordinal);
-        foreach (UsingDirectiveSyntax usingDirective in root.Usings)
+        foreach (UsingDirectiveSyntax usingDirective in allUsings)
         {
             if (!usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
                 usingDirective.Alias is null &&
@@ -126,7 +135,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // Accepts fully-qualified forms (e.g., "using static System.Text.Json.JsonSerializer;")
         // and simple-name forms (e.g., "using static JsonSerializer;") when the corresponding
         // namespace is imported and the name is not shadowed by a local type declaration.
-        bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
+        bool hasStaticSerializerImport = allUsings.Any(usingDirective =>
             usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
             usingDirective.Name is not null &&
             TriggerPayloadValidator.IsKnownStaticSerializerImport(

@@ -67,6 +67,14 @@ public sealed class SdkIndex
         foreach (string fullTypeName in this.TypeNames)
         {
             lookup.Add(fullTypeName);
+
+            // For nested types (e.g., "Namespace.Outer+Inner"), also add the dotted
+            // variant ("Namespace.Outer.Inner") since C# source code uses '.' not '+'.
+            if (fullTypeName.Contains('+'))
+            {
+                lookup.Add(fullTypeName.Replace('+', '.'));
+            }
+
             int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
             if (lastSeparator >= 0)
             {

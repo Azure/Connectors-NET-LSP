@@ -1109,4 +1109,97 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeMismatch, StringComparison.Ordinal));
         Assert.IsNotNull(mismatch, message: "Expected CSDK200 for nested type that exists in index but doesn't match the expected payload.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_NamespaceScopedUsing_EmitsCSdk201()
+    {
+        // Arrange — using directive inside a namespace declaration should still be detected.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            namespace MyApp
+            {
+                using System.Text.Json;
+                class Test
+                {
+                    [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                    public async Task MyMethod()
+                    {
+                        var payload = JsonSerializer.Deserialize<object>(body);
+                    }
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : System.Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — namespace-scoped using should be recognized
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for namespace-scoped using directive.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_FullyQualifiedNestedTypeInSource_EmitsCSdk200()
+    {
+        // Arrange — source uses the fully-qualified dotted form for a nested type
+        // (Microsoft.Azure...Outer.WrongTriggerPayload). BuildTypeNameLookup adds
+        // a dotted variant of the full path so the type is found in the lookup.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex nestedSdkIndex = SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
+            {
+                ["office365"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+            },
+            typeNames: new[]
+            {
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+            });
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Outer.WrongTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, nestedSdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — the fully-qualified dotted form matches the dotted variant in
+        // the lookup, so the type IS found. But it doesn't match the expected
+        // payload (Office365OnNewEmailTriggerPayload), so CSDK200 fires.
+        Diagnostic? mismatch = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeMismatch, StringComparison.Ordinal));
+        Assert.IsNotNull(mismatch, message: "Expected CSDK200 for fully-qualified nested type using dotted form.");
+    }
 }
