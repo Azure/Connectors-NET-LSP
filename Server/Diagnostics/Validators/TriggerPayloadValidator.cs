@@ -101,13 +101,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // Collect imported namespace names to validate serializer receiver types.
         // Each serializer type (JsonSerializer, JsonConvert) is only accepted when
         // its specific namespace (System.Text.Json, Newtonsoft.Json) is imported.
+        // Normalize global:: prefix so "using global::System.Text.Json;" matches "System.Text.Json".
         var importedNamespaces = new HashSet<string>(StringComparer.Ordinal);
         foreach (UsingDirectiveSyntax usingDirective in root.Usings)
         {
             if (!usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
                 usingDirective.Name is not null)
             {
-                importedNamespaces.Add(usingDirective.Name.ToString());
+                importedNamespaces.Add(TriggerPayloadValidator.NormalizeUsingName(usingDirective.Name.ToString()));
             }
         }
 

@@ -943,4 +943,96 @@ public class TriggerPayloadValidatorTests
         // Assert
         Assert.AreEqual(0, diagnostics.Count, message: "No diagnostic expected for global:: prefixed correct payload type.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_GlobalQualifiedUsingNamespace_EmitsCSdk201()
+    {
+        // Arrange — using global::System.Text.Json; should be normalized to System.Text.Json
+        // so that JsonSerializer is recognized as a known serializer receiver.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using global::System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — should recognize the serializer despite global:: prefix on the using directive
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 when using global::System.Text.Json namespace import.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_NestedSdkType_EmitsCSdk200()
+    {
+        // Arrange — SDK type names use '+' for nested types (e.g., "Namespace.Outer+Inner"),
+        // but C# source code uses '.' (e.g., "Outer.Inner"). BuildTypeNameLookup extracts
+        // the rightmost segment after '+' into the lookup set, so "InnerTriggerPayload" is
+        // found as an existing type, but it doesn't match the expected payload for the operation.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex nestedSdkIndex = SdkIndex.CreateForTesting(
+            connectorNames: new[]
+            {
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+            },
+            triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
+            {
+                ["office365"] = ImmutableArray.Create(
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+            },
+            typeNames: new[]
+            {
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+            });
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<WrongTriggerPayload>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, nestedSdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — WrongTriggerPayload is found in TypeNameLookup (extracted from
+        // "Outer+WrongTriggerPayload" via the '+' separator), but doesn't match
+        // the expected Office365OnNewEmailTriggerPayload, so CSDK200 fires.
+        Diagnostic? mismatch = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeMismatch, StringComparison.Ordinal));
+        Assert.IsNotNull(mismatch, message: "Expected CSDK200 for nested type that exists in index but doesn't match the expected payload.");
+    }
 }
