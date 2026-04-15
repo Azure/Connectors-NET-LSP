@@ -87,9 +87,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // (e.g., using static System.Text.Json.JsonSerializer). If so, bare Deserialize<T>()
         // calls without a receiver are valid and should be checked.
         bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
-            usingDirective.StaticKeyword.Value is not null &&
+            usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
+            usingDirective.Name is not null &&
             TriggerPayloadValidator.KnownSerializerTypeNames.Contains(
-                TriggerPayloadValidator.GetSimpleTypeName(usingDirective.Name!)));
+                TriggerPayloadValidator.GetSimpleTypeName(usingDirective.Name)));
 
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
@@ -317,9 +318,8 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Require a known serializer receiver for member access and conditional access calls.
-        // Direct calls (receiverName is null) are allowed only when hasStaticSerializerImport is true
-        // (handled above by returning null early if no static import exists).
-        if (receiverName is null || !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
+        // Direct calls (receiverName is null) are allowed when hasStaticSerializerImport is true.
+        if (receiverName is not null && !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
         {
             return null;
         }

@@ -835,4 +835,40 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
         Assert.IsNotNull(weakType, message: "Expected CSDK201 for conditional-access Deserialize with weak type.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_UsingStaticDirectCall_EmitsCSdk201()
+    {
+        // Arrange — using static System.Text.Json.JsonSerializer enables bare Deserialize<T>() calls
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using static System.Text.Json.JsonSerializer;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for bare Deserialize<object> with using static.");
+    }
 }
