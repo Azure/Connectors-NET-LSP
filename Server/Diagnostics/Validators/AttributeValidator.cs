@@ -13,7 +13,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
-using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace SdkLspServer.Diagnostics.Validators;
