@@ -119,7 +119,8 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         // Use the full syntax text when the type argument is qualified (e.g., "Namespace.Type"),
         // otherwise fall back to the simple name for unqualified identifiers.
-        string typeKey = typeArgument is QualifiedNameSyntax or AliasQualifiedNameSyntax
+        bool isQualifiedType = typeArgument is QualifiedNameSyntax or AliasQualifiedNameSyntax;
+        string typeKey = isQualifiedType
             ? typeArgument.ToString()
             : simpleTypeName;
 
@@ -151,7 +152,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         string? expectedPayloadType = sdkIndex.GetPayloadTypeForOperation(triggerInfo.ConnectorNameValue, canonicalOperationName);
 
-        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, typeKey, expectedPayloadType, triggerInfo, sourceText, sdkIndex, diagnostics);
+        this.EmitPayloadDiagnostic(typeArgument, simpleTypeName, typeKey, isQualifiedType, expectedPayloadType, triggerInfo, sourceText, sdkIndex, diagnostics);
     }
 
     /// <summary>
@@ -161,6 +162,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         TypeSyntax typeArgument,
         string simpleTypeName,
         string typeKey,
+        bool isQualifiedType,
         string? expectedPayloadType,
         TriggerMetadataInfo triggerInfo,
         SourceText sourceText,
@@ -199,8 +201,12 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // CSDK202: Type not found in SDK type list (uses SdkIndex.TypeNameLookup).
-        // Check both the typeKey (which may be fully-qualified) and simple name.
-        if (!sdkIndex.TypeNameLookup.Contains(typeKey) && !sdkIndex.TypeNameLookup.Contains(simpleTypeName))
+        // For qualified types, only check the fully-qualified key to avoid false negatives
+        // where a different namespace has the same simple name.
+        bool typeExists = isQualifiedType
+            ? sdkIndex.TypeNameLookup.Contains(typeKey)
+            : sdkIndex.TypeNameLookup.Contains(typeKey) || sdkIndex.TypeNameLookup.Contains(simpleTypeName);
+        if (!typeExists)
         {
             string suggestion = $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'.";
             diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
@@ -212,10 +218,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Check if T matches the expected payload type.
-        // Compare both fully-qualified (typeKey vs expectedPayloadType) and simple names.
+        // For qualified types, require a fully-qualified match to avoid false suppression
+        // of CSDK200 when a different namespace has the same simple type name.
+        // For unqualified types, compare simple names.
         string expectedSimple = TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType);
-        if (string.Equals(typeKey, expectedPayloadType, StringComparison.Ordinal) ||
-            string.Equals(simpleTypeName, expectedSimple, StringComparison.Ordinal))
+        bool isMatch = isQualifiedType
+            ? string.Equals(typeKey, expectedPayloadType, StringComparison.Ordinal)
+            : string.Equals(simpleTypeName, expectedSimple, StringComparison.Ordinal);
+        if (isMatch)
         {
             return;
         }
