@@ -256,11 +256,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             genericName = memberAccess.Name as GenericNameSyntax;
             receiverName = TriggerPayloadValidator.GetReceiverSimpleName(memberAccess.Expression);
         }
-        else if (invocation.Expression is GenericNameSyntax directGeneric)
+        else if (invocation.Expression is GenericNameSyntax)
         {
-            // Direct call like Deserialize<T>(...) — no receiver to check, allow it
-            genericName = directGeneric;
-            receiverName = null;
+            // Direct call like Deserialize<T>(...) with no receiver — skip to avoid
+            // false positives from user-defined generic methods named Deserialize.
+            return null;
         }
         else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
         {
