@@ -147,7 +147,10 @@ The extension automatically:
   - `src/extension.ts` — Extension entry point: lifecycle, file watching, connection merging
   - `package.json` — Extension manifest with settings and commands
 - `SDK/` — SDK assembly storage directory
-- `Docs/` — Auto-generated connector documentation (from SDK reflection)
+- `Docs/` — Design documents and guides
+  - [`architecture.md`](Docs/architecture.md) — Architecture overview, analysis strategy, and design decisions *(planned — [#60](https://github.com/Azure/Connectors-NET-LSP/issues/60))*
+  - `design-attribute-context-completions.md` — Attribute-context completions design
+  - `E2E_TESTING_GUIDE.md` — End-to-end testing guide
 - `sdk-lsp-server.sln` — Solution file
 
 ## LSP Capabilities
