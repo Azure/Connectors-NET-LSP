@@ -59,10 +59,10 @@ public sealed class SdkIndex
                 foreach (string fullTypeName in this.TypeNames)
                 {
                     lookup.Add(fullTypeName);
-                    int lastDot = fullTypeName.LastIndexOf('.');
-                    if (lastDot >= 0)
+                    int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
+                    if (lastSeparator >= 0)
                     {
-                        lookup.Add(fullTypeName.Substring(lastDot + 1));
+                        lookup.Add(fullTypeName.Substring(lastSeparator + 1));
                     }
                 }
 

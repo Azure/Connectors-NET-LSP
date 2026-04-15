@@ -227,6 +227,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
     /// <summary>
     /// Extracts the <see cref="GenericNameSyntax"/> from an invocation if it is a deserialization call.
+    /// Handles direct calls, member access, and conditional access (e.g., <c>serializer?.Deserialize&lt;T&gt;()</c>).
     /// Returns null if the invocation is not a recognized deserialization method.
     /// </summary>
     private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation)
@@ -240,6 +241,12 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         else if (invocation.Expression is GenericNameSyntax directGeneric)
         {
             genericName = directGeneric;
+        }
+        else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
+        {
+            // Handles conditional access: serializer?.Deserialize<T>(body)
+            // Roslyn parses the inner invocation with MemberBindingExpressionSyntax.
+            genericName = memberBinding.Name as GenericNameSyntax;
         }
 
         if (genericName is null)

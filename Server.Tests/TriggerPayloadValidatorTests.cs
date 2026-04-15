@@ -795,4 +795,41 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
         Assert.IsNotNull(weakType, message: "Expected CSDK201 for fully-qualified JsonElement.");
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_ConditionalAccessDeserialize_EmitsCSdk201()
+    {
+        // Arrange — conditional access deserialization: serializer?.Deserialize<object>(body)
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    JsonSerializer serializer = null;
+                    var payload = serializer?.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
+        Assert.IsNotNull(weakType, message: "Expected CSDK201 for conditional-access Deserialize with weak type.");
+    }
 }
