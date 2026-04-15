@@ -90,10 +90,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             .GetTextAsync(cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Cache resolved TriggerMetadataInfo per method to avoid re-scanning
-        // attributes and SDK operation lists for each Deserialize<T> call.
-        var triggerMetadataCache = new Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?>();
-
         // Check if the file imports known serializer namespaces (e.g., using System.Text.Json).
         // This is used to gate simple-name receiver matching and reduce false positives from
         // user-defined types named JsonSerializer or JsonConvert.
@@ -118,13 +114,8 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Use cached trigger metadata — skip methods without trigger attributes
-            if (!triggerMetadataCache.TryGetValue(method, out TriggerMetadataInfo? triggerInfo))
-            {
-                triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(method, sdkIndex);
-                triggerMetadataCache[method] = triggerInfo;
-            }
-
+            // Each method is visited exactly once, so no caching is needed.
+            TriggerMetadataInfo? triggerInfo = TriggerPayloadValidator.ExtractTriggerMetadata(method, sdkIndex);
             if (triggerInfo is null)
             {
                 continue;
