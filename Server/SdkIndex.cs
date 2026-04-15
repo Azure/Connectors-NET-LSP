@@ -114,8 +114,8 @@ public sealed class SdkIndex
     /// </summary>
     public ImmutableArray<SdkConstant> GetTriggerOperations(string connectorName)
     {
-        return TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> ops)
-            ? ops
+        return TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations)
+            ? operations
             : ImmutableArray<SdkConstant>.Empty;
     }
 
@@ -124,7 +124,7 @@ public sealed class SdkIndex
     /// </summary>
     public IEnumerable<SdkConstant> GetAllTriggerOperations()
     {
-        return TriggerOperationsByConnector.Values.SelectMany(ops => ops);
+        return TriggerOperationsByConnector.Values.SelectMany(operation => operation);
     }
 
     /// <summary>
@@ -133,13 +133,13 @@ public sealed class SdkIndex
     /// </summary>
     public string? GetPayloadTypeForOperation(string connectorName, string operationName)
     {
-        if (!TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> ops) || ops.IsEmpty)
+        if (!TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations) || operations.IsEmpty)
         {
             return null;
         }
 
         // Extract connector prefix from class name: "Office365TriggerOperations" → "Office365"
-        string className = ops[0].ClassName;
+        string className = operations[0].ClassName;
         int trigIdx = className.IndexOf("TriggerOperations", StringComparison.Ordinal);
         if (trigIdx <= 0)
         {
