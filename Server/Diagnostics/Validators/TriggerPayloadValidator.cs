@@ -351,18 +351,22 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
     /// <summary>
     /// Normalizes a <see cref="QualifiedNameSyntax"/> by stripping any <c>global::</c>
-    /// alias prefix from its leftmost part. For <c>global::Namespace.Type</c> returns
-    /// <c>"Namespace.Type"</c>. For normal qualified names, returns <c>ToString()</c>.
+    /// alias prefix from its leftmost part. For <c>global::A.B.C</c> returns <c>"A.B.C"</c>.
+    /// Walks the left chain recursively to handle deeply nested qualified names.
+    /// For normal qualified names without alias, returns <c>ToString()</c>.
     /// </summary>
     private static string NormalizeQualifiedName(QualifiedNameSyntax qualified)
     {
-        // If the leftmost part is an AliasQualifiedNameSyntax (global::...), strip it
-        if (qualified.Left is AliasQualifiedNameSyntax aliasLeft)
+        string text = qualified.ToString();
+
+        // For deeply nested forms like global::A.B.C, the ToString() includes "global::"
+        // Strip it if present.
+        if (text.StartsWith("global::", StringComparison.Ordinal))
         {
-            return aliasLeft.Name + "." + qualified.Right;
+            return text.Substring("global::".Length);
         }
 
-        return qualified.ToString();
+        return text;
     }
 
     /// <summary>
