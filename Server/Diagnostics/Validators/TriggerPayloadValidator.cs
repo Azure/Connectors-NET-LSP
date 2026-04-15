@@ -159,6 +159,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     {
         LspRange typeRange = ValidatorHelpers.ToLspRange(typeArgument.Span, sourceText);
 
+        // Use the original syntax text for diagnostic messages (e.g., "System.Text.Json.JsonElement")
+        // instead of the simplified name, to be clear about what the user wrote.
+        string typeArgumentText = typeArgument.ToString();
+
         // CSDK203: Operation does not map to a known payload type.
         // Check this before the weak-type check so that unmapped operations
         // are always surfaced, even when T is a weak type like 'object'.
@@ -168,7 +172,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                 typeRange,
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadOperationUnmapped,
-                $"Operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}' does not map to a known trigger payload type. Cannot verify Deserialize<{simpleTypeName}>."));
+                $"Operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}' does not map to a known trigger payload type. Cannot verify Deserialize<{typeArgumentText}>."));
             return;
         }
 
@@ -180,7 +184,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                 typeRange,
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadWeakType,
-                $"Deserialize<{simpleTypeName}> uses a weak type. Use the typed payload '{expectedSimpleName}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
+                $"Deserialize<{typeArgumentText}> uses a weak type. Use the typed payload '{expectedSimpleName}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
             return;
         }
 
@@ -193,7 +197,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                 typeRange,
                 LspDiagnosticSeverity.Error,
                 DiagnosticCodes.TriggerPayloadTypeNotFound,
-                $"Type '{simpleTypeName}' is not found in the SDK type list.{suggestion}"));
+                $"Type '{typeArgumentText}' is not found in the SDK type list.{suggestion}"));
             return;
         }
 
@@ -213,7 +217,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                 typeRange,
                 LspDiagnosticSeverity.Warning,
                 DiagnosticCodes.TriggerPayloadNotPayloadType,
-                $"Type '{simpleTypeName}' does not follow the expected trigger payload naming convention (name should end with 'TriggerPayload'). Use '{expectedSimple}' for operation '{triggerInfo.OperationName}'."));
+                $"Type '{typeArgumentText}' does not follow the expected trigger payload naming convention (name should end with 'TriggerPayload'). Use '{expectedSimple}' for operation '{triggerInfo.OperationName}'."));
             return;
         }
 
@@ -222,7 +226,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             typeRange,
             LspDiagnosticSeverity.Error,
             DiagnosticCodes.TriggerPayloadTypeMismatch,
-            $"Deserialize<{simpleTypeName}> does not match the expected payload type '{expectedSimple}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
+            $"Deserialize<{typeArgumentText}> does not match the expected payload type '{expectedSimple}' for operation '{triggerInfo.OperationName}' on connector '{triggerInfo.ConnectorNameValue}'."));
     }
 
     /// <summary>
@@ -370,14 +374,15 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Extracts the simple name from a fully qualified type name.
+    /// Extracts the simple name from a fully qualified or nested type name.
     /// For <c>Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload</c>
     /// returns <c>"Office365OnNewEmailTriggerPayload"</c>.
+    /// For <c>Namespace.Outer+Inner</c> returns <c>"Inner"</c>.
     /// </summary>
     private static string ExtractSimpleNameFromFullName(string fullTypeName)
     {
-        int lastDot = fullTypeName.LastIndexOf('.');
-        return lastDot >= 0 ? fullTypeName.Substring(lastDot + 1) : fullTypeName;
+        int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
+        return lastSeparator >= 0 ? fullTypeName.Substring(lastSeparator + 1) : fullTypeName;
     }
 
     /// <summary>
