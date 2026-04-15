@@ -265,9 +265,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
         {
             // Handles conditional access: serializer?.Deserialize<T>(body)
-            // Instance-based — skip receiver check since this is not a static call.
             genericName = memberBinding.Name as GenericNameSyntax;
-            receiverName = null;
+
+            // Recover the receiver from the enclosing conditional access expression
+            // so we can apply the same known-serializer check as for normal member access.
+            if (invocation.Parent is ConditionalAccessExpressionSyntax conditionalAccess)
+            {
+                receiverName = TriggerPayloadValidator.GetReceiverSimpleName(conditionalAccess.Expression);
+            }
         }
 
         if (genericName is null)

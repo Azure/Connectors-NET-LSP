@@ -46,8 +46,9 @@ public sealed class SdkIndex
 
     /// <summary>
     /// Gets a pre-computed frozen lookup set of type names for fast existence checks.
-    /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload"),
-    /// simple names (e.g., "Office365OnNewEmailTriggerPayload"), and nested type names.
+    /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
+    /// and the rightmost simple name segment (e.g., "Office365OnNewEmailTriggerPayload").
+    /// For nested types ("Outer+Inner"), only the innermost name ("Inner") is added.
     /// Thread-safe: uses Interlocked.CompareExchange to ensure a single instance.
     /// Immutable: returns FrozenSet which cannot be modified.
     /// </summary>
@@ -124,7 +125,7 @@ public sealed class SdkIndex
     /// </summary>
     public IEnumerable<SdkConstant> GetAllTriggerOperations()
     {
-        return TriggerOperationsByConnector.Values.SelectMany(operation => operation);
+        return TriggerOperationsByConnector.Values.SelectMany(operations => operations);
     }
 
     /// <summary>

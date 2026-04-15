@@ -799,7 +799,7 @@ public class TriggerPayloadValidatorTests
     [TestMethod]
     public async Task ValidateAsync_ConditionalAccessDeserialize_EmitsCSdk201()
     {
-        // Arrange — conditional access deserialization: serializer?.Deserialize<object>(body)
+        // Arrange — conditional access deserialization with known serializer type name as receiver
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
         var uri = DocumentUri.From("file:///test.cs");
@@ -811,8 +811,8 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    JsonSerializer serializer = null;
-                    var payload = serializer?.Deserialize<object>(body);
+                    JsonSerializer JsonSerializer = null;
+                    var payload = JsonSerializer?.Deserialize<object>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
