@@ -83,10 +83,18 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // attributes and SDK operation lists for each Deserialize<T> call.
         var triggerMetadataCache = new Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?>();
 
+        // Check if the file contains a using static directive for a known serializer type
+        // (e.g., using static System.Text.Json.JsonSerializer). If so, bare Deserialize<T>()
+        // calls without a receiver are valid and should be checked.
+        bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
+            usingDirective.StaticKeyword.Value is not null &&
+            TriggerPayloadValidator.KnownSerializerTypeNames.Contains(
+                TriggerPayloadValidator.GetSimpleTypeName(usingDirective.Name!)));
+
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, triggerMetadataCache, diagnostics);
+            this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, triggerMetadataCache, diagnostics);
         }
 
         return diagnostics;
@@ -100,10 +108,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SourceText sourceText,
         SdkIndex sdkIndex,
+        bool hasStaticSerializerImport,
         Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?> triggerMetadataCache,
         List<LspDiagnostic> diagnostics)
     {
-        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation);
+        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport);
         if (genericName is null)
         {
             return;
@@ -119,10 +128,15 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
         // Use the full syntax text when the type argument is qualified (e.g., "Namespace.Type"),
         // otherwise fall back to the simple name for unqualified identifiers.
+        // Normalize alias-qualified names (e.g., "global::Namespace.Type") by stripping
+        // the alias prefix so the key matches SDK index entries.
         bool isQualifiedType = typeArgument is QualifiedNameSyntax or AliasQualifiedNameSyntax;
-        string typeKey = isQualifiedType
-            ? typeArgument.ToString()
-            : simpleTypeName;
+        string typeKey = typeArgument switch
+        {
+            AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name.ToString(),
+            QualifiedNameSyntax qualified => qualified.ToString(),
+            _ => simpleTypeName,
+        };
 
         // Find the enclosing method and its [ConnectorTriggerMetadata] attribute
         MethodDeclarationSyntax? enclosingMethod = invocation.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
@@ -203,9 +217,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // CSDK202: Type not found in SDK type list (uses SdkIndex.TypeNameLookup).
         // For qualified types, only check the fully-qualified key to avoid false negatives
         // where a different namespace has the same simple name.
+        // For unqualified types, check the simple name once (typeKey == simpleTypeName).
         bool typeExists = isQualifiedType
             ? sdkIndex.TypeNameLookup.Contains(typeKey)
-            : sdkIndex.TypeNameLookup.Contains(typeKey) || sdkIndex.TypeNameLookup.Contains(simpleTypeName);
+            : sdkIndex.TypeNameLookup.Contains(simpleTypeName);
         if (!typeExists)
         {
             string suggestion = $" Expected type: '{TriggerPayloadValidator.ExtractSimpleNameFromFullName(expectedPayloadType)}'.";
@@ -256,7 +271,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// Returns null if the invocation is not a recognized deserialization method or the receiver
     /// is not a known serializer type.
     /// </summary>
-    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation)
+    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport)
     {
         GenericNameSyntax? genericName = null;
         string? receiverName = null;
@@ -266,11 +281,17 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             genericName = memberAccess.Name as GenericNameSyntax;
             receiverName = TriggerPayloadValidator.GetReceiverSimpleName(memberAccess.Expression);
         }
-        else if (invocation.Expression is GenericNameSyntax)
+        else if (invocation.Expression is GenericNameSyntax directGeneric)
         {
-            // Direct call like Deserialize<T>(...) with no receiver — skip to avoid
-            // false positives from user-defined generic methods named Deserialize.
-            return null;
+            // Direct call like Deserialize<T>(...) with no receiver.
+            // Only allow when the file has a using static directive for a known serializer.
+            if (!hasStaticSerializerImport)
+            {
+                return null;
+            }
+
+            genericName = directGeneric;
+            receiverName = null;
         }
         else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
         {
@@ -295,8 +316,9 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return null;
         }
 
-        // Require a known serializer receiver for all call patterns.
-        // Direct calls with no receiver and calls on unknown types are skipped.
+        // Require a known serializer receiver for member access and conditional access calls.
+        // Direct calls (receiverName is null) are allowed only when hasStaticSerializerImport is true
+        // (handled above by returning null early if no static import exists).
         if (receiverName is null || !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
         {
             return null;
