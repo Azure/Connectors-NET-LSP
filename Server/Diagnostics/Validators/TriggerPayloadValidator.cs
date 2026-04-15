@@ -373,7 +373,9 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
                                        importedNamespaces.Contains(expectedNamespace);
 
-            // Check if the full receiver expression is a fully-qualified known serializer
+            // Check if the full receiver expression is a fully-qualified known serializer.
+            // Reuses KnownFullyQualifiedSerializerTypes (the single source of truth for
+            // serializer identity) so adding a new serializer only requires updating one place.
             bool isFullyQualified = false;
             if (!isKnownBySimpleName && invocation.Expression is MemberAccessExpressionSyntax fullMemberAccess)
             {
@@ -385,8 +387,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                     fullReceiverText = fullReceiverText.Substring("global::".Length);
                 }
 
-                isFullyQualified = string.Equals(fullReceiverText, "System.Text.Json.JsonSerializer", StringComparison.Ordinal) ||
-                                   string.Equals(fullReceiverText, "Newtonsoft.Json.JsonConvert", StringComparison.Ordinal);
+                isFullyQualified = TriggerPayloadValidator.KnownFullyQualifiedSerializerTypes.Contains(fullReceiverText);
             }
 
             if (!isKnownBySimpleName && !isFullyQualified)
