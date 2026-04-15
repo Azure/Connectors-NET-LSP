@@ -57,15 +57,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     };
 
     /// <summary>
-    /// Known namespace prefixes that contain serializer types.
-    /// </summary>
-    private static readonly HashSet<string> KnownSerializerNamespaces = new(StringComparer.Ordinal)
-    {
-        "System.Text.Json",
-        "Newtonsoft.Json",
-    };
-
-    /// <summary>
     /// Weak type names that should use a typed payload when one exists.
     /// </summary>
     private static readonly HashSet<string> WeakTypeNames = new(StringComparer.Ordinal)
@@ -361,15 +352,20 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             // Check if the receiver is a known serializer by simple name + namespace import
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
-                                       importedNamespaces.Any(ns =>
-                                           string.Equals(ns, expectedNamespace, StringComparison.Ordinal) ||
-                                           ns.StartsWith(expectedNamespace + ".", StringComparison.Ordinal));
+                                       importedNamespaces.Contains(expectedNamespace);
 
             // Check if the full receiver expression is a fully-qualified known serializer
             bool isFullyQualified = false;
             if (!isKnownBySimpleName && invocation.Expression is MemberAccessExpressionSyntax fullMemberAccess)
             {
                 string fullReceiverText = fullMemberAccess.Expression.ToString();
+
+                // Strip global:: prefix if present
+                if (fullReceiverText.StartsWith("global::", StringComparison.Ordinal))
+                {
+                    fullReceiverText = fullReceiverText.Substring("global::".Length);
+                }
+
                 isFullyQualified = string.Equals(fullReceiverText, "System.Text.Json.JsonSerializer", StringComparison.Ordinal) ||
                                    string.Equals(fullReceiverText, "Newtonsoft.Json.JsonConvert", StringComparison.Ordinal);
             }
@@ -381,17 +377,6 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         return genericName;
-    }
-
-    /// <summary>
-    /// Checks whether a namespace name matches or starts with a known serializer namespace.
-    /// For example, "System.Text.Json" and "Newtonsoft.Json" return true.
-    /// </summary>
-    private static bool IsKnownSerializerNamespace(string namespaceName)
-    {
-        return TriggerPayloadValidator.KnownSerializerNamespaces.Any(known =>
-            string.Equals(namespaceName, known, StringComparison.Ordinal) ||
-            namespaceName.StartsWith(known + ".", StringComparison.Ordinal));
     }
 
     /// <summary>
