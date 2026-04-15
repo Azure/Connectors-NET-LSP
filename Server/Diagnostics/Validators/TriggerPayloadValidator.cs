@@ -435,6 +435,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// <summary>
     /// Extracts the trigger metadata from the enclosing method's <c>[ConnectorTriggerMetadata]</c> attribute.
     /// Returns null if the method does not have the attribute or if ConnectorName/OperationName cannot be resolved.
+    /// Skips malformed/partial attributes and continues searching for a valid one.
     /// </summary>
     private static TriggerMetadataInfo? ExtractTriggerMetadata(MethodDeclarationSyntax method, SdkIndex sdkIndex)
     {
@@ -453,7 +454,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
                 if (connectorNameArgument is null || operationNameArgument is null)
                 {
-                    return null;
+                    continue;
                 }
 
                 string? connectorNameText = ValidatorHelpers.ExtractStringValue(connectorNameArgument);
@@ -461,13 +462,13 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
                 if (connectorNameText is null || operationNameText is null)
                 {
-                    return null;
+                    continue;
                 }
 
                 string? connectorNameValue = TriggerPayloadValidator.ResolveConnectorNameValue(connectorNameText, sdkIndex);
                 if (connectorNameValue is null)
                 {
-                    return null;
+                    continue;
                 }
 
                 return new TriggerMetadataInfo(connectorNameValue, operationNameText);
