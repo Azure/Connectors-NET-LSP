@@ -808,6 +808,7 @@ public class TriggerPayloadValidatorTests
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
             using System;
+            using System.Text.Json;
             class JsonSerializer { public T Deserialize<T>(string s) => default; }
             class Test
             {

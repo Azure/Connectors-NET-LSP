@@ -47,6 +47,17 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     };
 
     /// <summary>
+    /// Known namespace prefixes that contain serializer types.
+    /// Used with <see cref="KnownSerializerTypeNames"/> to validate that a simple receiver
+    /// name matches one of these namespaces via a using directive.
+    /// </summary>
+    private static readonly HashSet<string> KnownSerializerNamespaces = new(StringComparer.Ordinal)
+    {
+        "System.Text.Json",
+        "Newtonsoft.Json",
+    };
+
+    /// <summary>
     /// Weak type names that should use a typed payload when one exists.
     /// </summary>
     private static readonly HashSet<string> WeakTypeNames = new(StringComparer.Ordinal)
@@ -83,6 +94,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // attributes and SDK operation lists for each Deserialize<T> call.
         var triggerMetadataCache = new Dictionary<MethodDeclarationSyntax, TriggerMetadataInfo?>();
 
+        // Check if the file imports known serializer namespaces (e.g., using System.Text.Json).
+        // This is used to gate simple-name receiver matching and reduce false positives from
+        // user-defined types named JsonSerializer or JsonConvert.
+        bool hasSerializerNamespaceImport = root.Usings.Any(usingDirective =>
+            !usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
+            usingDirective.Name is not null &&
+            TriggerPayloadValidator.IsKnownSerializerNamespace(usingDirective.Name.ToString()));
+
         // Check if the file contains a using static directive for a known serializer type
         // (e.g., using static System.Text.Json.JsonSerializer). If so, bare Deserialize<T>()
         // calls without a receiver are valid and should be checked.
@@ -115,7 +134,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             foreach (InvocationExpressionSyntax invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, triggerInfo, diagnostics);
+                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, hasSerializerNamespaceImport, triggerInfo, diagnostics);
             }
         }
 
@@ -131,10 +150,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         SourceText sourceText,
         SdkIndex sdkIndex,
         bool hasStaticSerializerImport,
+        bool hasSerializerNamespaceImport,
         TriggerMetadataInfo triggerInfo,
         List<LspDiagnostic> diagnostics)
     {
-        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport);
+        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport, hasSerializerNamespaceImport);
         if (genericName is null)
         {
             return;
@@ -283,7 +303,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// Returns null if the invocation is not a recognized deserialization method or the receiver
     /// is not a known serializer type.
     /// </summary>
-    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport)
+    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport, bool hasSerializerNamespaceImport)
     {
         GenericNameSyntax? genericName = null;
         string? receiverName = null;
@@ -329,13 +349,32 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Require a known serializer receiver for member access and conditional access calls.
+        // For simple-name receivers (e.g., "JsonSerializer"), also require a matching namespace
+        // import to reduce false positives from user-defined types with the same name.
+        // Fully-qualified receivers (e.g., "System.Text.Json.JsonSerializer") are accepted directly.
         // Direct calls (receiverName is null) are allowed when hasStaticSerializerImport is true.
-        if (receiverName is not null && !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
+        if (receiverName is not null)
         {
-            return null;
+            bool isKnownSerializer = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
+                                     hasSerializerNamespaceImport;
+            if (!isKnownSerializer)
+            {
+                return null;
+            }
         }
 
         return genericName;
+    }
+
+    /// <summary>
+    /// Checks whether a namespace name matches or starts with a known serializer namespace.
+    /// For example, "System.Text.Json" and "Newtonsoft.Json" return true.
+    /// </summary>
+    private static bool IsKnownSerializerNamespace(string namespaceName)
+    {
+        return TriggerPayloadValidator.KnownSerializerNamespaces.Any(known =>
+            string.Equals(namespaceName, known, StringComparison.Ordinal) ||
+            namespaceName.StartsWith(known + ".", StringComparison.Ordinal));
     }
 
     /// <summary>
