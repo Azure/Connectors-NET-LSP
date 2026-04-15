@@ -285,9 +285,9 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return null;
         }
 
-        // For member access calls, verify the receiver is a known serializer type.
-        // Direct calls (no receiver) are allowed since they may be extension methods or static imports.
-        if (receiverName is not null && !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
+        // Require a known serializer receiver for all call patterns.
+        // Direct calls with no receiver and calls on unknown types are skipped.
+        if (receiverName is null || !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
         {
             return null;
         }

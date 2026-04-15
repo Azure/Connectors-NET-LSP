@@ -39,41 +39,42 @@ public sealed class SdkIndex
 
     /// <summary>
     /// Lazily-initialized frozen lookup set containing both fully-qualified, simple,
-    /// and nested type names for O(1) existence checks. Built once per SdkIndex instance
-    /// using Interlocked.CompareExchange for thread-safe single initialization.
+    /// and nested type names for O(1) existence checks. Built exactly once per SdkIndex
+    /// instance using synchronized lazy initialization.
     /// </summary>
     private FrozenSet<string>? typeNameLookupCache;
+    private bool typeNameLookupInitialized;
+    private object? typeNameLookupLock;
 
     /// <summary>
     /// Gets a pre-computed frozen lookup set of type names for fast existence checks.
     /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
     /// and the rightmost simple name segment (e.g., "Office365OnNewEmailTriggerPayload").
     /// For nested types ("Outer+Inner"), only the innermost name ("Inner") is added.
-    /// Thread-safe: uses Interlocked.CompareExchange to ensure a single instance.
+    /// Thread-safe: uses LazyInitializer.EnsureInitialized to guarantee single execution.
     /// Immutable: returns FrozenSet which cannot be modified.
     /// </summary>
-    public FrozenSet<string> TypeNameLookup
+    public FrozenSet<string> TypeNameLookup =>
+        LazyInitializer.EnsureInitialized(
+            ref this.typeNameLookupCache,
+            ref this.typeNameLookupInitialized,
+            ref this.typeNameLookupLock,
+            this.BuildTypeNameLookup)!;
+
+    private FrozenSet<string> BuildTypeNameLookup()
     {
-        get
+        var lookup = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string fullTypeName in this.TypeNames)
         {
-            if (this.typeNameLookupCache is null)
+            lookup.Add(fullTypeName);
+            int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
+            if (lastSeparator >= 0)
             {
-                var lookup = new HashSet<string>(StringComparer.Ordinal);
-                foreach (string fullTypeName in this.TypeNames)
-                {
-                    lookup.Add(fullTypeName);
-                    int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
-                    if (lastSeparator >= 0)
-                    {
-                        lookup.Add(fullTypeName.Substring(lastSeparator + 1));
-                    }
-                }
-
-                Interlocked.CompareExchange(ref this.typeNameLookupCache, lookup.ToFrozenSet(StringComparer.Ordinal), comparand: null);
+                lookup.Add(fullTypeName.Substring(lastSeparator + 1));
             }
-
-            return this.typeNameLookupCache!;
         }
+
+        return lookup.ToFrozenSet(StringComparer.Ordinal);
     }
 
     private SdkIndex(
