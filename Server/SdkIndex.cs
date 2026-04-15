@@ -71,7 +71,7 @@ public sealed class SdkIndex
                 Interlocked.CompareExchange(ref this.typeNameLookupCache, lookup.ToFrozenSet(StringComparer.Ordinal), comparand: null);
             }
 
-            return this.typeNameLookupCache;
+            return this.typeNameLookupCache!;
         }
     }
 
