@@ -799,19 +799,22 @@ public class TriggerPayloadValidatorTests
     [TestMethod]
     public async Task ValidateAsync_ConditionalAccessDeserialize_EmitsCSdk201()
     {
-        // Arrange — conditional access deserialization with known serializer type name as receiver
+        // Arrange — conditional access deserialization with a local variable named JsonSerializer
+        // to exercise the MemberBindingExpressionSyntax path with a known serializer receiver name.
+        // Note: System.Text.Json.JsonSerializer is static, so real conditional access wouldn't compile.
+        // This test verifies the syntax-level detection logic, not semantic correctness.
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
             using System;
-            using System.Text.Json;
+            class JsonSerializer { public T Deserialize<T>(string s) => default; }
             class Test
             {
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    JsonSerializer JsonSerializer = null;
+                    var JsonSerializer = new JsonSerializer();
                     var payload = JsonSerializer?.Deserialize<object>(body);
                 }
             }
