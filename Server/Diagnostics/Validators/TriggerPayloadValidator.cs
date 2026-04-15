@@ -340,15 +340,25 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Require a known serializer receiver for member access and conditional access calls.
-        // For simple-name receivers (e.g., "JsonSerializer"), also require a matching namespace
-        // import to reduce false positives from user-defined types with the same name.
-        // Fully-qualified receivers (e.g., "System.Text.Json.JsonSerializer") are accepted directly.
+        // For simple-name receivers (e.g., "JsonSerializer"), require a matching namespace import.
+        // For fully-qualified receivers (e.g., "System.Text.Json.JsonSerializer"), accept directly.
         // Direct calls (receiverName is null) are allowed when hasStaticSerializerImport is true.
         if (receiverName is not null)
         {
-            bool isKnownSerializer = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
-                                     hasSerializerNamespaceImport;
-            if (!isKnownSerializer)
+            // Check if the receiver is a known serializer by simple name + namespace import
+            bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
+                                       hasSerializerNamespaceImport;
+
+            // Check if the full receiver expression is a fully-qualified known serializer
+            bool isFullyQualified = false;
+            if (!isKnownBySimpleName && invocation.Expression is MemberAccessExpressionSyntax fullMemberAccess)
+            {
+                string fullReceiverText = fullMemberAccess.Expression.ToString();
+                isFullyQualified = string.Equals(fullReceiverText, "System.Text.Json.JsonSerializer", StringComparison.Ordinal) ||
+                                   string.Equals(fullReceiverText, "Newtonsoft.Json.JsonConvert", StringComparison.Ordinal);
+            }
+
+            if (!isKnownBySimpleName && !isFullyQualified)
             {
                 return null;
             }
