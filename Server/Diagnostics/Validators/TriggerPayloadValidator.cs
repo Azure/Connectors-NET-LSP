@@ -120,6 +120,13 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             TriggerPayloadValidator.KnownFullyQualifiedSerializerTypes.Contains(
                 TriggerPayloadValidator.NormalizeUsingName(usingDirective.Name.ToString())));
 
+        // Collect type names declared in this compilation unit. If the file declares
+        // a class/struct named e.g. "JsonSerializer", it shadows the imported type and
+        // we must not treat simple-name receivers with that name as known serializers.
+        var localTypeNames = new HashSet<string>(
+            root.DescendantNodes().OfType<TypeDeclarationSyntax>().Select(t => t.Identifier.Text),
+            StringComparer.Ordinal);
+
         // Iterate only methods with trigger metadata attributes to avoid walking
         // every invocation in the entire file. This reduces per-keystroke cost
         // in the LSP scenario for large files.
@@ -138,7 +145,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             foreach (InvocationExpressionSyntax invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, importedNamespaces, triggerInfo, diagnostics);
+                this.ValidateDeserializeInvocation(invocation, sourceText, sdkIndex, hasStaticSerializerImport, importedNamespaces, localTypeNames, triggerInfo, diagnostics);
             }
         }
 
@@ -155,10 +162,11 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         SdkIndex sdkIndex,
         bool hasStaticSerializerImport,
         HashSet<string> importedNamespaces,
+        HashSet<string> localTypeNames,
         TriggerMetadataInfo triggerInfo,
         List<LspDiagnostic> diagnostics)
     {
-        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport, importedNamespaces);
+        GenericNameSyntax? genericName = TriggerPayloadValidator.ExtractDeserializeGenericName(invocation, hasStaticSerializerImport, importedNamespaces, localTypeNames);
         if (genericName is null)
         {
             return;
@@ -303,11 +311,12 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     /// <summary>
     /// Extracts the <see cref="GenericNameSyntax"/> from an invocation if it is a deserialization call
     /// on a known serializer type (e.g., <c>JsonSerializer</c>, <c>JsonConvert</c>).
-    /// Handles direct calls, member access, and conditional access (e.g., <c>serializer?.Deserialize&lt;T&gt;()</c>).
-    /// Returns null if the invocation is not a recognized deserialization method or the receiver
-    /// is not a known serializer type.
+    /// Handles direct calls and member access.
+    /// Returns null if the invocation is not a recognized deserialization method, the receiver
+    /// is not a known serializer type, or the call uses conditional access (known serializers
+    /// are static types and cannot be used with <c>?.</c>).
     /// </summary>
-    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport, HashSet<string> importedNamespaces)
+    private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation, bool hasStaticSerializerImport, HashSet<string> importedNamespaces, HashSet<string> localTypeNames)
     {
         GenericNameSyntax? genericName = null;
         string? receiverName = null;
@@ -329,17 +338,14 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             genericName = directGeneric;
             receiverName = null;
         }
-        else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
+        else if (invocation.Expression is MemberBindingExpressionSyntax)
         {
-            // Handles conditional access: serializer?.Deserialize<T>(body)
-            genericName = memberBinding.Name as GenericNameSyntax;
-
-            // Recover the receiver from the enclosing conditional access expression
-            // so we can apply the same known-serializer check as for normal member access.
-            if (invocation.Parent is ConditionalAccessExpressionSyntax conditionalAccess)
-            {
-                receiverName = TriggerPayloadValidator.GetReceiverSimpleName(conditionalAccess.Expression);
-            }
+            // Conditional access: e.g., serializer?.Deserialize<T>(body).
+            // Known serializer types (JsonSerializer, JsonConvert) are static classes,
+            // so conditional access (?.) cannot be used on them in valid C#.
+            // Any deserialization call via conditional access is therefore on a
+            // non-SDK serializer — skip it to avoid false positives.
+            return null;
         }
 
         if (genericName is null)
@@ -352,14 +358,18 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return null;
         }
 
-        // Require a known serializer receiver for member access and conditional access calls.
-        // For simple-name receivers (e.g., "JsonSerializer"), require a matching namespace import.
+        // Require a known serializer receiver for member access calls.
+        // For simple-name receivers (e.g., "JsonSerializer"), require a matching namespace import
+        // and verify the name is not shadowed by a locally declared type.
         // For fully-qualified receivers (e.g., "System.Text.Json.JsonSerializer"), accept directly.
         // Direct calls (receiverName is null) are allowed when hasStaticSerializerImport is true.
         if (receiverName is not null)
         {
-            // Check if the receiver is a known serializer by simple name + namespace import
+            // Check if the receiver is a known serializer by simple name + namespace import.
+            // Suppress the match when the compilation unit declares a type with the same name,
+            // since the local declaration shadows the imported serializer type.
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
+                                       !localTypeNames.Contains(receiverName) &&
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
                                        importedNamespaces.Contains(expectedNamespace);
 

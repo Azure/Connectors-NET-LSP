@@ -797,12 +797,12 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConditionalAccessDeserialize_EmitsCSdk201()
+    public async Task ValidateAsync_ConditionalAccessDeserialize_NoDiagnostic()
     {
-        // Arrange — conditional access deserialization with a local variable named JsonSerializer
-        // to exercise the MemberBindingExpressionSyntax path with a known serializer receiver name.
-        // Note: System.Text.Json.JsonSerializer is static, so real conditional access wouldn't compile.
-        // This test verifies the syntax-level detection logic, not semantic correctness.
+        // Arrange — conditional access deserialization is skipped entirely because
+        // known serializer types (JsonSerializer, JsonConvert) are static classes and
+        // cannot be used with ?. in valid C#. Any conditional access receiver is
+        // therefore a user-defined type or variable, not an SDK serializer.
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
         var uri = DocumentUri.From("file:///test.cs");
@@ -831,10 +831,47 @@ public class TriggerPayloadValidatorTests
             .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Assert
-        Diagnostic? weakType = diagnostics.FirstOrDefault(diagnostic =>
-            string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
-        Assert.IsNotNull(weakType, message: "Expected CSDK201 for conditional-access Deserialize with weak type.");
+        // Assert — no diagnostics because conditional access is not flagged
+        Assert.AreEqual(0, diagnostics.Count, message: "Conditional access on a non-static receiver should not emit diagnostics.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_LocalTypeShadowsSerializer_NoDiagnostic()
+    {
+        // Arrange — file declares a class named "JsonSerializer" that shadows the imported type.
+        // The simple-name receiver should not be treated as a known serializer.
+        var validator = new TriggerPayloadValidator();
+        SdkIndex sdkIndex = TriggerPayloadValidatorTests.CreateMockSdkIndex();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            using System.Text.Json;
+            class JsonSerializer
+            {
+                public static T Deserialize<T>(string s) => default;
+            }
+            class Test
+            {
+                [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
+                public async Task MyMethod()
+                {
+                    var payload = JsonSerializer.Deserialize<object>(body);
+                }
+            }
+            public sealed class ConnectorTriggerMetadataAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — no diagnostics because local type shadows the imported serializer
+        Assert.AreEqual(0, diagnostics.Count, message: "Local type declaration shadows the imported serializer; should not emit diagnostics.");
     }
 
     [TestMethod]
