@@ -57,6 +57,15 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     };
 
     /// <summary>
+    /// Fully-qualified type names of known serializers for validating using static directives.
+    /// </summary>
+    private static readonly HashSet<string> KnownFullyQualifiedSerializerTypes = new(StringComparer.Ordinal)
+    {
+        "System.Text.Json.JsonSerializer",
+        "Newtonsoft.Json.JsonConvert",
+    };
+
+    /// <summary>
     /// Weak type names that should use a typed payload when one exists.
     /// </summary>
     private static readonly HashSet<string> WeakTypeNames = new(StringComparer.Ordinal)
@@ -103,13 +112,13 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Check if the file contains a using static directive for a known serializer type
-        // (e.g., using static System.Text.Json.JsonSerializer). If so, bare Deserialize<T>()
-        // calls without a receiver are valid and should be checked.
+        // (e.g., using static System.Text.Json.JsonSerializer). Validates the full qualified type
+        // name to avoid false positives from user-defined types with the same simple name.
         bool hasStaticSerializerImport = root.Usings.Any(usingDirective =>
             usingDirective.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) &&
             usingDirective.Name is not null &&
-            TriggerPayloadValidator.KnownSerializerTypeNames.Contains(
-                TriggerPayloadValidator.GetSimpleTypeName(usingDirective.Name)));
+            TriggerPayloadValidator.KnownFullyQualifiedSerializerTypes.Contains(
+                TriggerPayloadValidator.NormalizeUsingName(usingDirective.Name.ToString())));
 
         // Iterate only methods with trigger metadata attributes to avoid walking
         // every invocation in the entire file. This reduces per-keystroke cost
@@ -393,6 +402,16 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name.Identifier.Text,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Normalizes a using directive name by stripping the <c>global::</c> prefix if present.
+    /// </summary>
+    private static string NormalizeUsingName(string usingName)
+    {
+        return usingName.StartsWith("global::", StringComparison.Ordinal)
+            ? usingName.Substring("global::".Length)
+            : usingName;
     }
 
     /// <summary>
