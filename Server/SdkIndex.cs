@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -37,19 +38,20 @@ public sealed class SdkIndex
     public string Summary => $"{AssemblyPaths.Length} assemblies, {TypeNames.Length} types";
 
     /// <summary>
-    /// Lazily-initialized lookup set containing both fully-qualified and simple
-    /// type names for O(1) existence checks. Built once per SdkIndex instance
-    /// and reused across all validator invocations.
+    /// Lazily-initialized frozen lookup set containing both fully-qualified, simple,
+    /// and nested type names for O(1) existence checks. Built once per SdkIndex instance
+    /// using Interlocked.CompareExchange for thread-safe single initialization.
     /// </summary>
-    private volatile IReadOnlySet<string>? typeNameLookupCache;
+    private FrozenSet<string>? typeNameLookupCache;
 
     /// <summary>
-    /// Gets a pre-computed read-only lookup set of type names for fast existence checks.
-    /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
-    /// and simple names (e.g., "Office365OnNewEmailTriggerPayload").
-    /// Thread-safe: uses volatile field with idempotent initialization.
+    /// Gets a pre-computed frozen lookup set of type names for fast existence checks.
+    /// Contains both fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload"),
+    /// simple names (e.g., "Office365OnNewEmailTriggerPayload"), and nested type names.
+    /// Thread-safe: uses Interlocked.CompareExchange to ensure a single instance.
+    /// Immutable: returns FrozenSet which cannot be modified.
     /// </summary>
-    public IReadOnlySet<string> TypeNameLookup
+    public FrozenSet<string> TypeNameLookup
     {
         get
         {
@@ -66,7 +68,7 @@ public sealed class SdkIndex
                     }
                 }
 
-                this.typeNameLookupCache = lookup;
+                Interlocked.CompareExchange(ref this.typeNameLookupCache, lookup.ToFrozenSet(StringComparer.Ordinal), comparand: null);
             }
 
             return this.typeNameLookupCache;

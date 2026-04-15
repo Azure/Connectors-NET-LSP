@@ -37,6 +37,16 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     };
 
     /// <summary>
+    /// Known serializer type names (simple identifiers) that host deserialization methods.
+    /// Used to reduce false positives from user-defined methods named Deserialize.
+    /// </summary>
+    private static readonly HashSet<string> KnownSerializerTypeNames = new(StringComparer.Ordinal)
+    {
+        "JsonSerializer",
+        "JsonConvert",
+    };
+
+    /// <summary>
     /// Weak type names that should use a typed payload when one exists.
     /// </summary>
     private static readonly HashSet<string> WeakTypeNames = new(StringComparer.Ordinal)
@@ -230,27 +240,34 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Extracts the <see cref="GenericNameSyntax"/> from an invocation if it is a deserialization call.
+    /// Extracts the <see cref="GenericNameSyntax"/> from an invocation if it is a deserialization call
+    /// on a known serializer type (e.g., <c>JsonSerializer</c>, <c>JsonConvert</c>).
     /// Handles direct calls, member access, and conditional access (e.g., <c>serializer?.Deserialize&lt;T&gt;()</c>).
-    /// Returns null if the invocation is not a recognized deserialization method.
+    /// Returns null if the invocation is not a recognized deserialization method or the receiver
+    /// is not a known serializer type.
     /// </summary>
     private static GenericNameSyntax? ExtractDeserializeGenericName(InvocationExpressionSyntax invocation)
     {
         GenericNameSyntax? genericName = null;
+        string? receiverName = null;
 
         if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             genericName = memberAccess.Name as GenericNameSyntax;
+            receiverName = TriggerPayloadValidator.GetReceiverSimpleName(memberAccess.Expression);
         }
         else if (invocation.Expression is GenericNameSyntax directGeneric)
         {
+            // Direct call like Deserialize<T>(...) — no receiver to check, allow it
             genericName = directGeneric;
+            receiverName = null;
         }
         else if (invocation.Expression is MemberBindingExpressionSyntax memberBinding)
         {
             // Handles conditional access: serializer?.Deserialize<T>(body)
-            // Roslyn parses the inner invocation with MemberBindingExpressionSyntax.
+            // Instance-based — skip receiver check since this is not a static call.
             genericName = memberBinding.Name as GenericNameSyntax;
+            receiverName = null;
         }
 
         if (genericName is null)
@@ -263,7 +280,30 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             return null;
         }
 
+        // For member access calls, verify the receiver is a known serializer type.
+        // Direct calls (no receiver) are allowed since they may be extension methods or static imports.
+        if (receiverName is not null && !TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName))
+        {
+            return null;
+        }
+
         return genericName;
+    }
+
+    /// <summary>
+    /// Extracts the simple (rightmost) identifier name from an expression used as a
+    /// method receiver. For <c>System.Text.Json.JsonSerializer</c> returns <c>"JsonSerializer"</c>.
+    /// For <c>serializer</c> (a variable) returns <c>"serializer"</c>.
+    /// </summary>
+    private static string? GetReceiverSimpleName(ExpressionSyntax expression)
+    {
+        return expression switch
+        {
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            MemberAccessExpressionSyntax memberAccess => memberAccess.Name.Identifier.Text,
+            AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name.Identifier.Text,
+            _ => null,
+        };
     }
 
     /// <summary>
