@@ -409,16 +409,17 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                     .Any(variableDeclarator => string.Equals(variableDeclarator.Identifier.Text, receiverName, StringComparison.Ordinal));
             }
 
-            // Reject instance member access (e.g., this.JsonSerializer.Deserialize<T>())
-            // since known serializers are static types and cannot be instance members.
-            bool isInstanceMemberAccess = invocation.Expression is MemberAccessExpressionSyntax receiverAccess &&
-                                          receiverAccess.Expression is MemberAccessExpressionSyntax parentAccess &&
-                                          parentAccess.Expression is ThisExpressionSyntax;
+            // Only accept simple-name receivers (IdentifierNameSyntax) for the namespace-gated check.
+            // This rejects expressions like SomeObject.JsonSerializer.Deserialize<T>() or
+            // this.JsonSerializer.Deserialize<T>() where GetReceiverSimpleName extracts "JsonSerializer"
+            // from a deeper member access chain. Those should fall through to the fully-qualified check.
+            bool isSimpleIdentifierReceiver = invocation.Expression is MemberAccessExpressionSyntax simpleCheck &&
+                                              simpleCheck.Expression is IdentifierNameSyntax;
 
-            bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
+            bool isKnownBySimpleName = isSimpleIdentifierReceiver &&
+                                       TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
                                        !localTypeNames.Contains(receiverName) &&
                                        !isShadowedByLocal &&
-                                       !isInstanceMemberAccess &&
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
                                        importedNamespaces.Contains(expectedNamespace);
 
