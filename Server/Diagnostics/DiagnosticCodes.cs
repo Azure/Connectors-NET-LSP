@@ -72,7 +72,20 @@ internal static class DiagnosticCodes
     // CSDK200–CSDK299: Trigger payload types
     // ---------------------------------------------------------------
 
-    // (reserved for future validators)
+    /// <summary>Deserialize&lt;T&gt; type does not match the expected trigger payload type for the operation.</summary>
+    public const string TriggerPayloadTypeMismatch = "CSDK200";
+
+    /// <summary>Deserialize&lt;T&gt; uses a weak type (object, Object, dynamic, JsonElement, JObject, JToken) when a typed payload exists.</summary>
+    public const string TriggerPayloadWeakType = "CSDK201";
+
+    /// <summary>Generic argument type in Deserialize&lt;T&gt; is not found in the SDK type list.</summary>
+    public const string TriggerPayloadTypeNotFound = "CSDK202";
+
+    /// <summary>Operation name in [ConnectorTriggerMetadata] does not map to a known trigger payload type.</summary>
+    public const string TriggerPayloadOperationUnmapped = "CSDK203";
+
+    /// <summary>Type used in Deserialize&lt;T&gt; does not follow the TriggerPayload naming convention.</summary>
+    public const string TriggerPayloadNotPayloadType = "CSDK204";
 
     // ---------------------------------------------------------------
     // CSDK300–CSDK399: DynamicValues / DynamicSchema

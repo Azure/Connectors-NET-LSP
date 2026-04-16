@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -36,6 +37,57 @@ public sealed class SdkIndex
     /// <summary>Gets a human‑readable summary describing how many assemblies and types were loaded.</summary>
     public string Summary => $"{AssemblyPaths.Length} assemblies, {TypeNames.Length} types";
 
+    /// <summary>
+    /// Lazily-initialized frozen lookup set containing both fully-qualified, simple,
+    /// and nested type names for O(1) existence checks. Built exactly once per SdkIndex
+    /// instance using synchronized lazy initialization.
+    /// </summary>
+    private FrozenSet<string>? typeNameLookupCache;
+    private bool typeNameLookupInitialized;
+    private object? typeNameLookupLock;
+
+    /// <summary>
+    /// Gets a pre-computed frozen lookup set of type names for fast existence checks.
+    /// Contains fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
+    /// and the rightmost simple name segment (e.g., "Office365OnNewEmailTriggerPayload").
+    /// If TypeNames contains nested types (e.g., "Namespace.Outer+Inner"), the lookup
+    /// also includes the dotted variant used in C# source ("Namespace.Outer.Inner")
+    /// and the innermost simple name ("Inner"). Note: the default SDK metadata discovery
+    /// skips nested types, so this only applies to test indexes or custom TypeNames.
+    /// Thread-safe: uses LazyInitializer.EnsureInitialized to guarantee single execution.
+    /// Immutable: returns FrozenSet which cannot be modified.
+    /// </summary>
+    public FrozenSet<string> TypeNameLookup =>
+        LazyInitializer.EnsureInitialized(
+            ref this.typeNameLookupCache,
+            ref this.typeNameLookupInitialized,
+            ref this.typeNameLookupLock,
+            this.BuildTypeNameLookup)!;
+
+    private FrozenSet<string> BuildTypeNameLookup()
+    {
+        var lookup = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string fullTypeName in this.TypeNames)
+        {
+            lookup.Add(fullTypeName);
+
+            // For nested types (e.g., "Namespace.Outer+Inner"), also add the dotted
+            // variant ("Namespace.Outer.Inner") since C# source code uses '.' not '+'.
+            if (fullTypeName.Contains('+'))
+            {
+                lookup.Add(fullTypeName.Replace('+', '.'));
+            }
+
+            int lastSeparator = Math.Max(fullTypeName.LastIndexOf('.'), fullTypeName.LastIndexOf('+'));
+            if (lastSeparator >= 0)
+            {
+                lookup.Add(fullTypeName.Substring(lastSeparator + 1));
+            }
+        }
+
+        return lookup.ToFrozenSet(StringComparer.Ordinal);
+    }
+
     private SdkIndex(
         string source,
         string root,
@@ -58,13 +110,14 @@ public sealed class SdkIndex
     /// </summary>
     internal static SdkIndex CreateForTesting(
         IEnumerable<SdkConstant> connectorNames,
-        IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations)
+        IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations,
+        IEnumerable<string>? typeNames = null)
     {
         return new SdkIndex(
             source: "test",
             root: string.Empty,
             assemblies: Array.Empty<string>(),
-            types: Array.Empty<string>(),
+            types: typeNames ?? Array.Empty<string>(),
             connectorNames: connectorNames,
             triggerOps: triggerOperations);
     }
@@ -74,8 +127,8 @@ public sealed class SdkIndex
     /// </summary>
     public ImmutableArray<SdkConstant> GetTriggerOperations(string connectorName)
     {
-        return TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> ops)
-            ? ops
+        return TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations)
+            ? operations
             : ImmutableArray<SdkConstant>.Empty;
     }
 
@@ -84,7 +137,7 @@ public sealed class SdkIndex
     /// </summary>
     public IEnumerable<SdkConstant> GetAllTriggerOperations()
     {
-        return TriggerOperationsByConnector.Values.SelectMany(ops => ops);
+        return TriggerOperationsByConnector.Values.SelectMany(operations => operations);
     }
 
     /// <summary>
@@ -93,13 +146,13 @@ public sealed class SdkIndex
     /// </summary>
     public string? GetPayloadTypeForOperation(string connectorName, string operationName)
     {
-        if (!TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> ops) || ops.IsEmpty)
+        if (!TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations) || operations.IsEmpty)
         {
             return null;
         }
 
         // Extract connector prefix from class name: "Office365TriggerOperations" → "Office365"
-        string className = ops[0].ClassName;
+        string className = operations[0].ClassName;
         int trigIdx = className.IndexOf("TriggerOperations", StringComparison.Ordinal);
         if (trigIdx <= 0)
         {

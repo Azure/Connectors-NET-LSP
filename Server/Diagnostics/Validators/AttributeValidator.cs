@@ -13,7 +13,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
-using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace SdkLspServer.Diagnostics.Validators;
@@ -405,11 +404,7 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// </summary>
     private static bool IsTriggerMetadataAttribute(string attributeName)
     {
-        string identifier = AttributeValidator.ExtractRightmostIdentifier(attributeName);
-        return string.Equals(identifier, "ConnectorTriggerMetadata", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTriggerMetadataAttribute", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTrigger", StringComparison.Ordinal) ||
-               string.Equals(identifier, "ConnectorTriggerAttribute", StringComparison.Ordinal);
+        return ValidatorHelpers.IsTriggerMetadataAttribute(attributeName);
     }
 
     /// <summary>
@@ -417,106 +412,50 @@ internal sealed class AttributeValidator : IDiagnosticValidator
     /// </summary>
     private static bool IsConnectorOperationAttribute(string attributeName)
     {
-        string identifier = AttributeValidator.ExtractRightmostIdentifier(attributeName);
+        string identifier = ValidatorHelpers.ExtractRightmostIdentifier(attributeName);
         return string.Equals(identifier, "ConnectorOperation", StringComparison.Ordinal) ||
                string.Equals(identifier, "ConnectorOperationAttribute", StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Extracts the rightmost identifier from a potentially qualified attribute name.
-    /// For example, "MyNamespace.ConnectorTriggerMetadata" and
-    /// "global::ConnectorTriggerMetadata" both return "ConnectorTriggerMetadata".
-    /// </summary>
-    private static string ExtractRightmostIdentifier(string attributeName)
-    {
-        int lastDot = attributeName.LastIndexOf('.');
-        int lastAliasQualifier = attributeName.LastIndexOf("::", StringComparison.Ordinal);
-
-        // Calculate the character position after each separator type.
-        // When not found (-1), use 0 so it doesn't affect the Max calculation.
-        int afterDot = lastDot >= 0 ? lastDot + 1 : 0;
-        int afterAlias = lastAliasQualifier >= 0 ? lastAliasQualifier + 2 : 0;
-        int identifierStartIndex = Math.Max(afterDot, afterAlias);
-
-        return identifierStartIndex > 0
-            ? attributeName.Substring(identifierStartIndex)
-            : attributeName;
-    }
-
-    /// <summary>
     /// Finds a named argument in an attribute by parameter name.
+    /// Delegates to <see cref="ValidatorHelpers.FindNamedArgument"/>.
     /// </summary>
     private static AttributeArgumentSyntax? FindNamedArgument(AttributeSyntax attribute, string parameterName)
     {
-        if (attribute.ArgumentList is null)
-        {
-            return null;
-        }
-
-        return attribute.ArgumentList.Arguments.FirstOrDefault(argument =>
-            argument.NameEquals is not null &&
-            string.Equals(argument.NameEquals.Name.Identifier.Text, parameterName, StringComparison.Ordinal));
+        return ValidatorHelpers.FindNamedArgument(attribute, parameterName);
     }
 
     /// <summary>
     /// Extracts the string value from an attribute argument expression.
-    /// Supports string literals (returns the literal value) and member access expressions
-    /// (returns the member name, e.g., "Office365" from ConnectorNames.Office365).
+    /// Delegates to <see cref="ValidatorHelpers.ExtractStringValue"/>.
     /// </summary>
     private static string? ExtractStringValue(AttributeArgumentSyntax argument)
     {
-        if (argument.Expression is LiteralExpressionSyntax literal &&
-            literal.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            return literal.Token.ValueText;
-        }
-
-        if (argument.Expression is MemberAccessExpressionSyntax memberAccess)
-        {
-            return memberAccess.Name.Identifier.Text;
-        }
-
-        if (argument.Expression is IdentifierNameSyntax identifier)
-        {
-            return identifier.Identifier.Text;
-        }
-
-        return null;
+        return ValidatorHelpers.ExtractStringValue(argument);
     }
 
     /// <summary>
     /// Gets the LSP range covering the attribute name for diagnostic placement.
+    /// Delegates to <see cref="ValidatorHelpers.GetAttributeNameRange"/>.
     /// </summary>
     private static LspRange GetAttributeNameRange(AttributeSyntax attribute, SourceText sourceText)
     {
-        TextSpan span = attribute.Name.Span;
-        return AttributeValidator.ToLspRange(span, sourceText);
+        return ValidatorHelpers.GetAttributeNameRange(attribute, sourceText);
     }
 
     /// <summary>
     /// Gets the LSP range covering the argument value expression for diagnostic placement.
+    /// Delegates to <see cref="ValidatorHelpers.GetArgumentValueRange"/>.
     /// </summary>
     private static LspRange GetArgumentValueRange(AttributeArgumentSyntax argument, SourceText sourceText)
     {
-        TextSpan span = argument.Expression.Span;
-        return AttributeValidator.ToLspRange(span, sourceText);
-    }
-
-    /// <summary>
-    /// Converts a Roslyn <see cref="TextSpan"/> to an LSP <see cref="LspRange"/>.
-    /// </summary>
-    private static LspRange ToLspRange(TextSpan span, SourceText sourceText)
-    {
-        LinePosition start = sourceText.Lines.GetLinePosition(span.Start);
-        LinePosition end = sourceText.Lines.GetLinePosition(span.End);
-
-        return new LspRange(
-            new LspPosition(start.Line, start.Character),
-            new LspPosition(end.Line, end.Character));
+        return ValidatorHelpers.GetArgumentValueRange(argument, sourceText);
     }
 
     /// <summary>
     /// Creates an LSP diagnostic with standard source.
+    /// Delegates to <see cref="ValidatorHelpers.CreateDiagnostic"/>.
     /// </summary>
     private static LspDiagnostic CreateDiagnostic(
         LspRange range,
@@ -524,13 +463,6 @@ internal sealed class AttributeValidator : IDiagnosticValidator
         string code,
         string message)
     {
-        return new LspDiagnostic
-        {
-            Range = range,
-            Severity = severity,
-            Code = code,
-            Source = DiagnosticCodes.Source,
-            Message = message,
-        };
+        return ValidatorHelpers.CreateDiagnostic(range, severity, code, message);
     }
 }
