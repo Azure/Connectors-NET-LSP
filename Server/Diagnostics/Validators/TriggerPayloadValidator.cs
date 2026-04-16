@@ -129,11 +129,24 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         }
 
         // Collect type names declared in this compilation unit. If the file declares
-        // a class/struct named e.g. "JsonSerializer", it shadows the imported type and
-        // we must not treat simple-name receivers with that name as known serializers.
-        var localTypeNames = new HashSet<string>(
-            root.DescendantNodes().OfType<TypeDeclarationSyntax>().Select(typeDeclaration => typeDeclaration.Identifier.Text),
-            StringComparer.Ordinal);
+        // a class, struct, enum, or delegate named e.g. "JsonSerializer", it shadows
+        // the imported type and we must not treat simple-name receivers with that name
+        // as known serializers.
+        var localTypeNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (MemberDeclarationSyntax member in root.DescendantNodes().OfType<MemberDeclarationSyntax>())
+        {
+            string? name = member switch
+            {
+                BaseTypeDeclarationSyntax baseType => baseType.Identifier.Text,
+                DelegateDeclarationSyntax delegateDecl => delegateDecl.Identifier.Text,
+                _ => null,
+            };
+
+            if (name is not null)
+            {
+                localTypeNames.Add(name);
+            }
+        }
 
         // Check if the file contains a using static directive for a known serializer type.
         // Accepts fully-qualified forms (e.g., "using static System.Text.Json.JsonSerializer;")
@@ -396,9 +409,16 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
                     .Any(variableDeclarator => string.Equals(variableDeclarator.Identifier.Text, receiverName, StringComparison.Ordinal));
             }
 
+            // Reject instance member access (e.g., this.JsonSerializer.Deserialize<T>())
+            // since known serializers are static types and cannot be instance members.
+            bool isInstanceMemberAccess = invocation.Expression is MemberAccessExpressionSyntax receiverAccess &&
+                                          receiverAccess.Expression is MemberAccessExpressionSyntax parentAccess &&
+                                          parentAccess.Expression is ThisExpressionSyntax;
+
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
                                        !localTypeNames.Contains(receiverName) &&
                                        !isShadowedByLocal &&
+                                       !isInstanceMemberAccess &&
                                        TriggerPayloadValidator.SerializerTypeToNamespace.TryGetValue(receiverName, out string? expectedNamespace) &&
                                        importedNamespaces.Contains(expectedNamespace);
 
