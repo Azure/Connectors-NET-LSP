@@ -105,10 +105,10 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // to code in other namespaces. We aggregate all usings as a simplification;
         // per-method scoping would be needed for strict correctness in multi-namespace
         // files, but those are extremely rare in Azure Functions projects.
-        IEnumerable<UsingDirectiveSyntax> allUsings = root.Usings.AsEnumerable();
-        foreach (BaseNamespaceDeclarationSyntax nsDecl in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
+        var allUsings = new List<UsingDirectiveSyntax>(root.Usings);
+        foreach (BaseNamespaceDeclarationSyntax namespaceDeclaration in root.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
         {
-            allUsings = allUsings.Concat(nsDecl.Usings);
+            allUsings.AddRange(namespaceDeclaration.Usings);
         }
 
         // Collect imported namespace names to validate serializer receiver types.
@@ -132,7 +132,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
         // a class/struct named e.g. "JsonSerializer", it shadows the imported type and
         // we must not treat simple-name receivers with that name as known serializers.
         var localTypeNames = new HashSet<string>(
-            root.DescendantNodes().OfType<TypeDeclarationSyntax>().Select(t => t.Identifier.Text),
+            root.DescendantNodes().OfType<TypeDeclarationSyntax>().Select(typeDeclaration => typeDeclaration.Identifier.Text),
             StringComparer.Ordinal);
 
         // Check if the file contains a using static directive for a known serializer type.
@@ -393,7 +393,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
             {
                 isShadowedByLocal = containingMethod.DescendantNodes()
                     .OfType<VariableDeclaratorSyntax>()
-                    .Any(v => string.Equals(v.Identifier.Text, receiverName, StringComparison.Ordinal));
+                    .Any(variableDeclarator => string.Equals(variableDeclarator.Identifier.Text, receiverName, StringComparison.Ordinal));
             }
 
             bool isKnownBySimpleName = TriggerPayloadValidator.KnownSerializerTypeNames.Contains(receiverName) &&
