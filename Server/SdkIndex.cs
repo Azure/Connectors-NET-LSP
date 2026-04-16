@@ -50,9 +50,10 @@ public sealed class SdkIndex
     /// Gets a pre-computed frozen lookup set of type names for fast existence checks.
     /// Contains fully-qualified names (e.g., "Microsoft.Azure...Office365OnNewEmailTriggerPayload")
     /// and the rightmost simple name segment (e.g., "Office365OnNewEmailTriggerPayload").
-    /// For nested types (e.g., "Namespace.Outer+Inner"), the lookup also includes the
-    /// dotted variant used in C# source ("Namespace.Outer.Inner") and the innermost
-    /// simple name ("Inner").
+    /// If TypeNames contains nested types (e.g., "Namespace.Outer+Inner"), the lookup
+    /// also includes the dotted variant used in C# source ("Namespace.Outer.Inner")
+    /// and the innermost simple name ("Inner"). Note: the default SDK metadata discovery
+    /// skips nested types, so this only applies to test indexes or custom TypeNames.
     /// Thread-safe: uses LazyInitializer.EnsureInitialized to guarantee single execution.
     /// Immutable: returns FrozenSet which cannot be modified.
     /// </summary>
