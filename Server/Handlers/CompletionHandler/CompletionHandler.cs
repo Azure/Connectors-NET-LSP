@@ -1098,7 +1098,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 Documentation = new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
-                    Value = $"**{shortName}**\n\nTyped trigger payload for AI Gateway callbacks.\n\n" +
+                    Value = $"**{shortName}**\n\nTyped trigger payload for Connector Gateway callbacks.\n\n" +
                             (namespacePart.Length > 0 ? $"Namespace: `{namespacePart}`\n\n" : string.Empty) +
                             "Use this type with `JsonSerializer.Deserialize<T>()` to deserialize incoming trigger callback payloads.",
                 },

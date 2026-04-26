@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IntelliSense completions for connector names, operation IDs, and parameter values
 - CodeLens showing operation metadata inline with code
 - Dynamic value resolution against live Azure connector APIs
-- Connection management view for AI Gateway connections
+- Connection management view for Connector Gateway connections
 - NuGet package auto-discovery from workspace project references
 - GitHub Actions CI workflow for build, test, and lint
 - GitHub Actions release workflow for automated VSIX packaging on tag push
