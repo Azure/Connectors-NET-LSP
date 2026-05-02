@@ -27,17 +27,17 @@ public class TriggerPayloadValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations"),
-                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations"),
+                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
                 ["teams"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsTriggerOperations")),
+                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.Sdk.Teams.TeamsTriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailMentioningMeTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsOnNewChannelMessageTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailMentioningMeTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Teams.TeamsOnNewChannelMessageTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.GraphClientReceiveMessage",
                 "Microsoft.Azure.Connectors.Sdk.TriggerCallbackPayload",
             });
     }
@@ -122,7 +122,7 @@ public class TriggerPayloadValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["sharepointonline"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewItem", "OnNewItem", "SharepointonlineTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Sharepointonline.SharepointonlineTriggerOperations")),
+                    new SdkConstant("OnNewItem", "OnNewItem", "SharepointonlineTriggerOperations", "Microsoft.Azure.Connectors.Sdk.Sharepointonline.SharepointonlineTriggerOperations")),
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -369,12 +369,12 @@ public class TriggerPayloadValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
                 // No payload type for OnNewEmail — simulates a missing TriggerPayload class
-                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
+                "Microsoft.Azure.Connectors.Sdk.Office365.GraphClientReceiveMessage",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -741,7 +741,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
@@ -1035,7 +1035,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<global::Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<global::Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
@@ -1107,12 +1107,12 @@ public class TriggerPayloadValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Outer+WrongTriggerPayload",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -1200,12 +1200,12 @@ public class TriggerPayloadValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Microsoft.Azure.Connectors.Sdk.Office365.Outer+WrongTriggerPayload",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -1216,7 +1216,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Outer.WrongTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.Sdk.Office365.Outer.WrongTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute

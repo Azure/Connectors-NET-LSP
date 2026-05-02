@@ -15,7 +15,7 @@ public class DynamicSchemaDetectionTests
     {
         // Arrange
         string code = """
-            using Microsoft.Azure.Connectors.DirectClient.Teams;
+            using Microsoft.Azure.Connectors.Sdk.Teams;
 
             var request = new DynamicPostMessageRequest();
             """;

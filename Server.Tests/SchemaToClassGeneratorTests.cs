@@ -32,7 +32,7 @@ public class SchemaToClassGeneratorTests
         string result = SchemaToClassGenerator.GenerateClass(
             className: "PostMessageInput",
             baseClassName: "DynamicPostMessageRequest",
-            baseClassNamespace: "Microsoft.Azure.Connectors.DirectClient.Teams",
+            baseClassNamespace: "Microsoft.Azure.Connectors.Sdk.Teams",
             schema: schema,
             targetNamespace: "MyApp.Models");
 
@@ -43,7 +43,7 @@ public class SchemaToClassGeneratorTests
         Assert.IsTrue(result.Contains("public string? MessageBody { get; set; }"), message: "Should have PascalCase property.");
         Assert.IsTrue(result.Contains("public string? Subject { get; set; }"), message: "Should have PascalCase property.");
         Assert.IsTrue(result.Contains("namespace MyApp.Models;"), message: "Should have target namespace.");
-        Assert.IsTrue(result.Contains("using Microsoft.Azure.Connectors.DirectClient.Teams;"), message: "Should import base class namespace.");
+        Assert.IsTrue(result.Contains("using Microsoft.Azure.Connectors.Sdk.Teams;"), message: "Should import base class namespace.");
     }
 
     [TestMethod]

@@ -199,7 +199,7 @@ public class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
     {
         string result = documentText;
 
-        // Replace fully-qualified form: new Microsoft.Azure.Connectors.DirectClient.Teams.DynamicPostMessageRequest()
+        // Replace fully-qualified form: new Microsoft.Azure.Connectors.Sdk.Teams.DynamicPostMessageRequest()
         if (!string.IsNullOrEmpty(typeNamespace))
         {
             string fqPattern = $"new {typeNamespace}.{dynamicTypeName}()";

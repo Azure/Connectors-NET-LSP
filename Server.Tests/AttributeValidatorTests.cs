@@ -27,10 +27,10 @@ public class AttributeValidatorTests
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations"),
-                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations"),
+                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
                 ["teams"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsTriggerOperations")),
+                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.Sdk.Teams.TeamsTriggerOperations")),
             });
     }
 
