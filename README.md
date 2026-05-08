@@ -2,6 +2,17 @@
 
 A Language Server Protocol (LSP) server and VS Code extension that provides intelligent code assistance for [Azure Connectors SDK](https://github.com/Azure/Connectors-NET-SDK) development. Built with OmniSharp.Extensions.LanguageServer and Roslyn for comprehensive C# code analysis.
 
+> [!CAUTION]
+> **Early Preview — Not for Production Use**
+>
+> This extension and LSP server are currently in early preview and under active development. They are intended for evaluation, experimentation, and feedback purposes only.
+>
+> - **Do not use in production environments.**
+> - **Breaking changes should be expected** across extension behavior, LSP features, and configuration in future releases.
+> - Features may be added, modified, or removed without prior notice.
+>
+> We welcome feedback and contributions — please [open an issue](https://github.com/Azure/Connectors-NET-LSP/issues) with questions, suggestions, or bug reports.
+
 ## Features
 
 - **Document Sync**: Real-time document tracking via thread-safe in-memory `BufferManager`
