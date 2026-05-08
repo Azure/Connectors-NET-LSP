@@ -71,9 +71,9 @@ dotnet LSPServer/SdkLspServer.dll --sdk <path-to-sdk-nupkg>
 
 Connections are not passed via the command line. They are supplied by the LSP client through `initializationOptions.connections` at startup or the `custom/updateConnections` notification at runtime.
 
-## Production Build & Distribution
+## Packaging & Distribution
 
-For production deployment (e.g., bundling with the VS Code extension), you can build a self-contained single-file executable:
+To build a self-contained single-file executable for bundling with the VS Code extension:
 
 ```bash
 # Build for current platform (outputs to ../LSPServer)
