@@ -44,7 +44,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_UnknownConnectorName_EmitsCSdk001()
+    public async Task ValidateAsync_UnknownConnectorName_EmitsCSdk001Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -78,7 +78,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_TypoInConnectorName_EmitsCSdk002()
+    public async Task ValidateAsync_TypoInConnectorName_EmitsCSdk002Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -112,7 +112,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_WrongCasingConnectorName_EmitsCSdk003()
+    public async Task ValidateAsync_WrongCasingConnectorName_EmitsCSdk003Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -146,7 +146,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_MissingConnectorName_EmitsCSdk004()
+    public async Task ValidateAsync_MissingConnectorName_EmitsCSdk004Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -179,7 +179,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_MissingOperationName_EmitsCSdk005()
+    public async Task ValidateAsync_MissingOperationName_EmitsCSdk005Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -212,7 +212,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NonAsyncMethod_EmitsCSdk006()
+    public async Task ValidateAsync_NonAsyncMethod_EmitsCSdk006Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -245,7 +245,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_AsyncTaskMethod_NoCSdk006()
+    public async Task ValidateAsync_AsyncTaskMethod_NoCSdk006Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -278,7 +278,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_AsyncVoidMethod_EmitsCSdk006()
+    public async Task ValidateAsync_AsyncVoidMethod_EmitsCSdk006Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -311,7 +311,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_UnknownOperationName_EmitsCSdk007()
+    public async Task ValidateAsync_UnknownOperationName_EmitsCSdk007Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -346,7 +346,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectorWithNoTriggers_EmitsCSdk008()
+    public async Task ValidateAsync_ConnectorWithNoTriggers_EmitsCSdk008Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -379,7 +379,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectorOperationUnknown_EmitsCSdk009()
+    public async Task ValidateAsync_ConnectorOperationUnknown_EmitsCSdk009Async()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -412,7 +412,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ValidConnectorAndOperation_NoDiagnostics()
+    public async Task ValidateAsync_ValidConnectorAndOperation_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -446,7 +446,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConstantReference_ValidConnector_NoDiagnosticOnConnectorName()
+    public async Task ValidateAsync_ConstantReference_ValidConnector_NoDiagnosticOnConnectorNameAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -479,7 +479,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NullSdkIndex_NoDiagnostics()
+    public async Task ValidateAsync_NullSdkIndex_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -508,7 +508,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_EmptyDocument_NoDiagnostics()
+    public async Task ValidateAsync_EmptyDocument_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -525,7 +525,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NoAttributes_NoDiagnostics()
+    public async Task ValidateAsync_NoAttributes_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -548,7 +548,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectorTriggerAttribute_AlsoRecognized()
+    public async Task ValidateAsync_ConnectorTriggerAttribute_AlsoRecognizedAsync()
     {
         // Arrange
         var validator = new AttributeValidator();
@@ -580,7 +580,7 @@ public class AttributeValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_DiagnosticRangesPointToArgumentValues()
+    public async Task ValidateAsync_DiagnosticRangesPointToArgumentValuesAsync()
     {
         // Arrange
         var validator = new AttributeValidator();

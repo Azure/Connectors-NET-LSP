@@ -198,7 +198,7 @@ public class SdkIndexConstantDiscoveryTests
     }
 
     [TestMethod]
-    public async Task TryCreateFromAssembliesAsync_ProducesSameResults_AsNupkgPath()
+    public async Task TryCreateFromAssembliesAsync_ProducesSameResults_AsNupkgPathAsync()
     {
         SkipIfNoSdk();
 
@@ -231,7 +231,7 @@ public class SdkIndexConstantDiscoveryTests
     }
 
     [TestMethod]
-    public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNull()
+    public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNullAsync()
     {
         var result = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync("/nonexistent/path.dll");
         Assert.IsNull(result);

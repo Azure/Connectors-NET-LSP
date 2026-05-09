@@ -87,7 +87,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NullConnections_ReturnsNoDiagnostics()
+    public async Task ValidateAsync_NullConnections_ReturnsNoDiagnosticsAsync()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -114,7 +114,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_EmptyDocument_ReturnsNoDiagnostics()
+    public async Task ValidateAsync_EmptyDocument_ReturnsNoDiagnosticsAsync()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -132,7 +132,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectionParameterValueNotInConfig_EmitsCSdk100()
+    public async Task ValidateAsync_ConnectionParameterValueNotInConfig_EmitsCSdk100Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -164,7 +164,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectionParameterValueValid_NoDiagnostic()
+    public async Task ValidateAsync_ConnectionParameterValueValid_NoDiagnosticAsync()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -194,7 +194,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_HardCodedConnectionString_EmitsCSdk101()
+    public async Task ValidateAsync_HardCodedConnectionString_EmitsCSdk101Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -225,7 +225,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_SubscriptionPathHardCoded_EmitsCSdk101()
+    public async Task ValidateAsync_SubscriptionPathHardCoded_EmitsCSdk101Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -255,7 +255,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NoConnectionForConnector_EmitsCSdk102()
+    public async Task ValidateAsync_NoConnectionForConnector_EmitsCSdk102Async()
     {
         // Arrange — only SharePoint configured, code uses office365
         var connectionsService = new ConnectionsService();
@@ -289,7 +289,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectionPresent_NoCSdk102()
+    public async Task ValidateAsync_ConnectionPresent_NoCSdk102Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -321,7 +321,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_MissingConnectionInAttribute_EmitsCSdk103()
+    public async Task ValidateAsync_MissingConnectionInAttribute_EmitsCSdk103Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -356,7 +356,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ValidConnectionInAttribute_NoCSdk103()
+    public async Task ValidateAsync_ValidConnectionInAttribute_NoCSdk103Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -389,7 +389,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_MultipleConnectionsForConnectorInAttribute_EmitsCSdk104()
+    public async Task ValidateAsync_MultipleConnectionsForConnectorInAttribute_EmitsCSdk104Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -424,7 +424,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_SingleConnectionForConnector_NoCSdk104()
+    public async Task ValidateAsync_SingleConnectionForConnector_NoCSdk104Async()
     {
         // Arrange — only one office365 connection
         var connectionsService = new ConnectionsService();
@@ -456,7 +456,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_InvocationMultipleConnections_EmitsCSdk104()
+    public async Task ValidateAsync_InvocationMultipleConnections_EmitsCSdk104Async()
     {
         // Arrange — multiple office365 connections, invocation with no explicit connection arg
         var connectionsService = new ConnectionsService();
@@ -491,7 +491,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectionTypeMismatch_EmitsCSdk105()
+    public async Task ValidateAsync_ConnectionTypeMismatch_EmitsCSdk105Async()
     {
         // Arrange — SharePoint connection used where office365 expected
         var connectionsService = new ConnectionsService();
@@ -536,7 +536,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectionTypeMatches_NoCSdk105()
+    public async Task ValidateAsync_ConnectionTypeMatches_NoCSdk105Async()
     {
         // Arrange
         var connectionsService = new ConnectionsService();
@@ -569,7 +569,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_InvocationConnectionTypeMismatch_EmitsCSdk105()
+    public async Task ValidateAsync_InvocationConnectionTypeMismatch_EmitsCSdk105Async()
     {
         // Arrange — SharePoint connection used in invocation where office365 is expected
         var connectionsService = new ConnectionsService();
@@ -606,7 +606,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_DirectClientConnection_NoFalsePositives()
+    public async Task ValidateAsync_DirectClientConnection_NoFalsePositivesAsync()
     {
         // Arrange — DirectClient connection configured
         var connectionsService = new ConnectionsService();
@@ -643,7 +643,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectorOperationAttribute_EmitsCSdk102()
+    public async Task ValidateAsync_ConnectorOperationAttribute_EmitsCSdk102Async()
     {
         // Arrange — no teams connection configured
         var connectionsService = new ConnectionsService();
@@ -676,7 +676,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_InvocationWithNoConnectionForConnector_EmitsCSdk102()
+    public async Task ValidateAsync_InvocationWithNoConnectionForConnector_EmitsCSdk102Async()
     {
         // Arrange — no teams connection configured, connector type inferred from invocation receiver
         var connectionsService = new ConnectionsService();
@@ -712,7 +712,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NonSdkAttribute_NoDiagnostics()
+    public async Task ValidateAsync_NonSdkAttribute_NoDiagnosticsAsync()
     {
         // Arrange — custom attribute should not trigger connection diagnostics
         var connectionsService = new ConnectionsService();
@@ -741,7 +741,7 @@ public class ConnectionConfigValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_EmptyConnectionsConfig_NoConnectionDiagnostics()
+    public async Task ValidateAsync_EmptyConnectionsConfig_NoConnectionDiagnosticsAsync()
     {
         // Arrange — connections config exists but is empty
         var connectionsService = new ConnectionsService();
