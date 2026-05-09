@@ -635,7 +635,7 @@ internal sealed class TriggerPayloadValidator : IDiagnosticValidator
 
     /// <summary>
     /// Extracts the simple name from a fully qualified or nested type name.
-    /// For <c>Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload</c>
+    /// For <c>Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload</c>
     /// returns <c>"Office365OnNewEmailTriggerPayload"</c>.
     /// For <c>Namespace.Outer+Inner</c> returns <c>"Inner"</c>.
     /// </summary>

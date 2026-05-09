@@ -39,7 +39,7 @@ public class SdkIndexConstantDiscoveryTests
             "..",
             "..",
             "SDK",
-            "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg");
+            "Azure.Connectors.Sdk.1.0.0.nupkg");
 
         if (!File.Exists(nupkgPath))
         {
@@ -51,7 +51,7 @@ public class SdkIndexConstantDiscoveryTests
                 "..",
                 "..",
                 "SDK",
-                "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg"));
+                "Azure.Connectors.Sdk.1.0.0.nupkg"));
         }
 
         sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);
@@ -204,7 +204,7 @@ public class SdkIndexConstantDiscoveryTests
 
         // Get the DLL paths from the nupkg-based index
         var dllPaths = SdkIndex.AssemblyPaths
-            .Where(assemblyPath => Path.GetFileName(assemblyPath).StartsWith("Microsoft.Azure.Connectors.Sdk", StringComparison.OrdinalIgnoreCase))
+            .Where(assemblyPath => Path.GetFileName(assemblyPath).StartsWith("Azure.Connectors.Sdk", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         Assert.IsTrue(dllPaths.Length > 0, "Should have at least one SDK assembly");

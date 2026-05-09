@@ -192,7 +192,7 @@ public class DiagnosticPublisherTests
         // Arrange
         var validator = new SdkUsageValidator();
         var uri = DocumentUri.From("file:///test.cs");
-        string documentText = "using Microsoft.Azure.Connectors.Sdk;\n\nclass Foo { }";
+        string documentText = "using Azure.Connectors.Sdk;\n\nclass Foo { }";
 
         // Act
         IReadOnlyList<Diagnostic> diagnostics = await validator

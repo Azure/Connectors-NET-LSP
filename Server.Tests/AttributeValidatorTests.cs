@@ -20,17 +20,17 @@ public class AttributeValidatorTests
         return AttributeValidatorTests.CreateMockSdkIndex(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("Teams", "teams", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Teams", "teams", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharePointOnline", "sharepointonline", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations"),
-                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations"),
+                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
                 ["teams"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsTriggerOperations")),
+                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Azure.Connectors.Sdk.Teams.TeamsTriggerOperations")),
             });
     }
 

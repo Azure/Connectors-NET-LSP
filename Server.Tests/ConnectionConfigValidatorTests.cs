@@ -22,9 +22,9 @@ public class ConnectionConfigValidatorTests
         return SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("Teams", "teams", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Teams", "teams", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharePointOnline", "sharepointonline", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>());
     }

@@ -9,13 +9,13 @@ namespace SdkLspServer.Diagnostics.Validators;
 
 /// <summary>
 /// Emits an informational diagnostic when a C# file does not reference the
-/// <c>Microsoft.Azure.Connectors.Sdk</c> namespace anywhere in its text,
+/// <c>Azure.Connectors.Sdk</c> namespace anywhere in its text,
 /// indicating that the file likely does not use the Connectors SDK.
 /// This is a lightweight heuristic check, not a precise using-directive analysis.
 /// </summary>
 internal sealed class SdkUsageValidator : IDiagnosticValidator
 {
-    private const string SdkNamespace = "Microsoft.Azure.Connectors.Sdk";
+    private const string SdkNamespace = "Azure.Connectors.Sdk";
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<Diagnostic>> ValidateAsync(

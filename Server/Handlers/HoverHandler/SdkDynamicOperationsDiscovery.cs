@@ -301,7 +301,7 @@ internal static partial class SdkDynamicOperationsDiscovery
         }
 
         // Fallback: infer connector name from containing type name.
-        // e.g., SharepointonlineClient → sharepointonline, SharepointonlineExtensions → sharepointonline
+            // e.g., SharePointOnlineClient → sharepointonline, SharePointOnlineExtensions → sharepointonline
         string? typeName = methodSymbol.ContainingType?.Name;
         if (!string.IsNullOrEmpty(typeName))
         {

@@ -236,7 +236,7 @@ public class DynamicSchemaCodeActionHandler(
             return null;
         }
 
-        // Infer connector from namespace: "Microsoft.Azure.Connectors.DirectClient.Teams" → "teams"
+        // Infer connector from namespace: "Azure.Connectors.Sdk.Teams" → "teams"
         string? connectorName = null;
         string typeNamespace = matchingFullName.Contains('.')
             ? matchingFullName[..matchingFullName.LastIndexOf('.')]

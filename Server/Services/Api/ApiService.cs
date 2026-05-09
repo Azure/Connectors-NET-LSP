@@ -27,7 +27,7 @@ public class ApiService
 {
     /// <summary>
     /// The OAuth scope required by Azure API Hub connections. This is the same scope used by the
-    /// generated SDK clients (e.g., <c>Office365Client</c>, <c>SharepointonlineClient</c>).
+    /// generated SDK clients (e.g., <c>Office365Client</c>, <c>SharePointOnlineClient</c>).
     /// </summary>
     private static readonly string[] ApiHubScopes = ["https://apihub.azure.com/.default"];
 
