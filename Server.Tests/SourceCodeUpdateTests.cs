@@ -10,7 +10,7 @@ public class SourceCodeUpdateTests
     {
         // Arrange
         string source = """
-            var messageRequest = new Microsoft.Azure.Connectors.DirectClient.Teams.DynamicPostMessageRequest();
+            var messageRequest = new Azure.Connectors.Sdk.Teams.DynamicPostMessageRequest();
             messageRequest.AdditionalProperties["messageBody"] = JsonSerializer.SerializeToElement("hello");
             """;
 
@@ -18,7 +18,7 @@ public class SourceCodeUpdateTests
         string result = GenerateDynamicSchemaCommandHandler.ApplySourceCodeUpdate(
             source,
             dynamicTypeName: "DynamicPostMessageRequest",
-            typeNamespace: "Microsoft.Azure.Connectors.DirectClient.Teams",
+            typeNamespace: "Azure.Connectors.Sdk.Teams",
             generatedClassName: "PostMessageInput");
 
         // Assert

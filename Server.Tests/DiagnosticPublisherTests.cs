@@ -53,7 +53,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task PublishDiagnosticsAsync_WithNoValidators_PublishesEmptyDiagnostics()
+    public async Task PublishDiagnosticsAsync_WithNoValidators_PublishesEmptyDiagnosticsAsync()
     {
         // Arrange
         PublishDiagnosticsParams? captured = null;
@@ -74,7 +74,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task PublishDiagnosticsAsync_AggregatesDiagnosticsFromMultipleValidators()
+    public async Task PublishDiagnosticsAsync_AggregatesDiagnosticsFromMultipleValidatorsAsync()
     {
         // Arrange
         var diag1 = new Diagnostic
@@ -115,7 +115,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task PublishDiagnosticsAsync_ValidatorThrows_OtherValidatorsStillRun()
+    public async Task PublishDiagnosticsAsync_ValidatorThrows_OtherValidatorsStillRunAsync()
     {
         // Arrange
         var diag = new Diagnostic
@@ -167,7 +167,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task SdkUsageValidator_NoSdkUsing_EmitsDiagnostic()
+    public async Task SdkUsageValidator_NoSdkUsing_EmitsDiagnosticAsync()
     {
         // Arrange
         var validator = new SdkUsageValidator();
@@ -187,12 +187,12 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task SdkUsageValidator_WithSdkUsing_NoDiagnostics()
+    public async Task SdkUsageValidator_WithSdkUsing_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new SdkUsageValidator();
         var uri = DocumentUri.From("file:///test.cs");
-        string documentText = "using Microsoft.Azure.Connectors.Sdk;\n\nclass Foo { }";
+        string documentText = "using Azure.Connectors.Sdk;\n\nclass Foo { }";
 
         // Act
         IReadOnlyList<Diagnostic> diagnostics = await validator
@@ -204,7 +204,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task SdkUsageValidator_EmptyDocument_NoDiagnostics()
+    public async Task SdkUsageValidator_EmptyDocument_NoDiagnosticsAsync()
     {
         // Arrange
         var validator = new SdkUsageValidator();
@@ -220,7 +220,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task ScheduleDebouncedPublish_OnlyLastScheduledPublishFires()
+    public async Task ScheduleDebouncedPublish_OnlyLastScheduledPublishFiresAsync()
     {
         // Arrange
         var publishedParams = new ConcurrentQueue<PublishDiagnosticsParams>();
@@ -254,7 +254,7 @@ public class DiagnosticPublisherTests
     }
 
     [TestMethod]
-    public async Task ClearDiagnostics_CancelsPendingDebounce_NoDiagnosticsPublishedAfterClear()
+    public async Task ClearDiagnostics_CancelsPendingDebounce_NoDiagnosticsPublishedAfterClearAsync()
     {
         // Arrange
         var publishedParams = new ConcurrentQueue<PublishDiagnosticsParams>();

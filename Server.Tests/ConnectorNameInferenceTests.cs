@@ -11,8 +11,8 @@ namespace Server.Tests;
 public class ConnectorNameInferenceTests
 {
     [TestMethod]
-    [DataRow("SharepointonlineClient", "sharepointonline")]
-    [DataRow("SharepointonlineExtensions", "sharepointonline")]
+    [DataRow("SharePointOnlineClient", "sharepointonline")]
+    [DataRow("SharePointOnlineExtensions", "sharepointonline")]
     [DataRow("Office365Client", "office365")]
     [DataRow("Office365Extensions", "office365")]
     [DataRow("MicrosoftformsClient", "microsoftforms")]

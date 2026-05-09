@@ -2388,7 +2388,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
             return "msnweather";
         }
 
-        // Try to infer from the containing type name (e.g., SharepointonlineClient → sharepointonline)
+        // Try to infer from the containing type name (e.g., SharePointOnlineClient → sharepointonline)
         if (context.Method?.ContainingType != null)
         {
             string containingType = context.Method.ContainingType.Name;

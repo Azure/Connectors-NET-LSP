@@ -31,30 +31,40 @@ public class SdkIndexConstantDiscoveryTests
     {
         _ = context;
 
-        // Use the SDK nupkg bundled with the LSP server
-        string nupkgPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "SDK",
-            "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg");
+        // Discover the SDK nupkg by glob pattern so the test survives version changes.
+        string? nupkgPath = FindSdkNupkg(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "SDK"));
 
-        if (!File.Exists(nupkgPath))
+        if (nupkgPath is null)
         {
             // CI builds may use a different relative path
-            nupkgPath = Path.GetFullPath(Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "..",
-                "..",
-                "..",
-                "..",
-                "SDK",
-                "Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg"));
+            nupkgPath = FindSdkNupkg(Path.GetFullPath(Path.Combine(
+                Directory.GetCurrentDirectory(), "..", "..", "..", "..", "SDK")));
         }
 
-        sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);
+        if (nupkgPath is not null)
+        {
+            sdkIndex = await SdkLspServer.SdkIndex
+                .TryCreateAsync(nupkgPath)
+                .ConfigureAwait(continueOnCapturedContext: false);
+        }
+    }
+
+    private static string? FindSdkNupkg(string sdkDirectory)
+    {
+        var sdkDir = new DirectoryInfo(sdkDirectory);
+        if (!sdkDir.Exists)
+        {
+            return null;
+        }
+
+        // Pick the newest Azure.Connectors.Sdk*.nupkg to handle version changes.
+        FileInfo? nupkg = sdkDir
+            .GetFiles("Azure.Connectors.Sdk*.nupkg", SearchOption.TopDirectoryOnly)
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .FirstOrDefault();
+
+        return nupkg?.FullName;
     }
 
     [TestMethod]
@@ -198,19 +208,21 @@ public class SdkIndexConstantDiscoveryTests
     }
 
     [TestMethod]
-    public async Task TryCreateFromAssembliesAsync_ProducesSameResults_AsNupkgPath()
+    public async Task TryCreateFromAssembliesAsync_ProducesSameResults_AsNupkgPathAsync()
     {
         SkipIfNoSdk();
 
         // Get the DLL paths from the nupkg-based index
         var dllPaths = SdkIndex.AssemblyPaths
-            .Where(assemblyPath => Path.GetFileName(assemblyPath).StartsWith("Microsoft.Azure.Connectors.Sdk", StringComparison.OrdinalIgnoreCase))
+            .Where(assemblyPath => Path.GetFileName(assemblyPath).StartsWith("Azure.Connectors.Sdk", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         Assert.IsTrue(dllPaths.Length > 0, "Should have at least one SDK assembly");
 
         // Create a second index from the DLL paths directly
-        var assemblyIndex = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync(dllPaths);
+        var assemblyIndex = await SdkLspServer.SdkIndex
+            .TryCreateFromAssembliesAsync(dllPaths)
+            .ConfigureAwait(continueOnCapturedContext: false);
         Assert.IsNotNull(assemblyIndex, "TryCreateFromAssembliesAsync should succeed for valid DLL paths");
 
         // Verify same connector constants are discovered
@@ -231,9 +243,11 @@ public class SdkIndexConstantDiscoveryTests
     }
 
     [TestMethod]
-    public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNull()
+    public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNullAsync()
     {
-        var result = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync("/nonexistent/path.dll");
+        var result = await SdkLspServer.SdkIndex
+            .TryCreateFromAssembliesAsync("/nonexistent/path.dll")
+            .ConfigureAwait(continueOnCapturedContext: false);
         Assert.IsNull(result);
     }
 }

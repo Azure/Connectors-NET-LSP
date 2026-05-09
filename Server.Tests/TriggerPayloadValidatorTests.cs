@@ -20,25 +20,25 @@ public class TriggerPayloadValidatorTests
         return SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("Teams", "teams", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
-                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Teams", "teams", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharePointOnline", "sharepointonline", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations"),
-                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations"),
+                    new SdkConstant("OnNewEmailMentioningMe", "OnNewEmailMentioningMe", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
                 ["teams"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsTriggerOperations")),
+                    new SdkConstant("OnNewChannelMessage", "OnNewChannelMessage", "TeamsTriggerOperations", "Azure.Connectors.Sdk.Teams.TeamsTriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailMentioningMeTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Teams.TeamsOnNewChannelMessageTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
-                "Microsoft.Azure.Connectors.Sdk.TriggerCallbackPayload",
+                "Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.Office365OnNewEmailMentioningMeTriggerPayload",
+                "Azure.Connectors.Sdk.Teams.TeamsOnNewChannelMessageTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.GraphClientReceiveMessage",
+                "Azure.Connectors.Sdk.TriggerCallbackPayload",
             });
     }
 
@@ -46,7 +46,7 @@ public class TriggerPayloadValidatorTests
     // Correct usage — no diagnostics
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_CorrectPayloadType_NoDiagnostic()
+    public async Task ValidateAsync_CorrectPayloadType_NoDiagnosticAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -80,7 +80,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NoTriggerAttribute_NoDiagnostic()
+    public async Task ValidateAsync_NoTriggerAttribute_NoDiagnosticAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -108,21 +108,21 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_EmitsCSdk203()
+    public async Task ValidateAsync_WeakTypeWithNoExpectedPayload_EmitsCSdk203Async()
     {
-        // Arrange — SharepointOnline includes the OnNewItem trigger operation, but the mock SdkIndex
+        // Arrange — SharePointOnline includes the OnNewItem trigger operation, but the mock SdkIndex
         // does not define a matching typed payload name. CSDK203 should fire because the operation
         // is unmapped, regardless of whether T is a weak type.
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("SharepointOnline", "sharepointonline", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("SharePointOnline", "sharepointonline", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["sharepointonline"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewItem", "OnNewItem", "SharepointonlineTriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Sharepointonline.SharepointonlineTriggerOperations")),
+                    new SdkConstant("OnNewItem", "OnNewItem", "SharePointOnlineTriggerOperations", "Azure.Connectors.Sdk.SharePointOnline.SharePointOnlineTriggerOperations")),
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -159,7 +159,7 @@ public class TriggerPayloadValidatorTests
     // CSDK200: Deserialize<T> type mismatch
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_WrongPayloadType_EmitsCSdk200()
+    public async Task ValidateAsync_WrongPayloadType_EmitsCSdk200Async()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -200,7 +200,7 @@ public class TriggerPayloadValidatorTests
     // CSDK201: Deserialize<T> uses weak type
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_ObjectType_EmitsCSdk201()
+    public async Task ValidateAsync_ObjectType_EmitsCSdk201Async()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -238,7 +238,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_DynamicType_EmitsCSdk201()
+    public async Task ValidateAsync_DynamicType_EmitsCSdk201Async()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -275,7 +275,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_JsonElementType_EmitsCSdk201()
+    public async Task ValidateAsync_JsonElementType_EmitsCSdk201Async()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -315,7 +315,7 @@ public class TriggerPayloadValidatorTests
     // CSDK202: Generic argument type not found
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_UnknownType_EmitsCSdk202()
+    public async Task ValidateAsync_UnknownType_EmitsCSdk202Async()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -357,24 +357,24 @@ public class TriggerPayloadValidatorTests
     // CSDK203: Operation name doesn't map to payload type
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_OperationWithNoPayloadMapping_EmitsCSdk203()
+    public async Task ValidateAsync_OperationWithNoPayloadMapping_EmitsCSdk203Async()
     {
         // Arrange — create an index where the operation exists but no matching type name
         var validator = new TriggerPayloadValidator();
         SdkIndex sdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
                 // No payload type for OnNewEmail — simulates a missing TriggerPayload class
-                "Microsoft.Azure.Connectors.DirectClient.Office365.GraphClientReceiveMessage",
+                "Azure.Connectors.Sdk.Office365.GraphClientReceiveMessage",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -412,7 +412,7 @@ public class TriggerPayloadValidatorTests
     // CSDK204: Type name does not follow the *TriggerPayload naming convention
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_NonPayloadType_EmitsCSdk204()
+    public async Task ValidateAsync_NonPayloadType_EmitsCSdk204Async()
     {
         // Arrange — GraphClientReceiveMessage exists but is not a *TriggerPayload
         var validator = new TriggerPayloadValidator();
@@ -455,7 +455,7 @@ public class TriggerPayloadValidatorTests
     // Edge cases
     // ---------------------------------------------------------------
     [TestMethod]
-    public async Task ValidateAsync_ConnectorNameAsConstant_ResolvesCorrectly()
+    public async Task ValidateAsync_ConnectorNameAsConstant_ResolvesCorrectlyAsync()
     {
         // Arrange — uses ConnectorNames.Office365 member access syntax
         var validator = new TriggerPayloadValidator();
@@ -490,7 +490,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_DeserializeAsyncMethod_ValidatesPayload()
+    public async Task ValidateAsync_DeserializeAsyncMethod_ValidatesPayloadAsync()
     {
         // Arrange — DeserializeAsync should also be checked
         var validator = new TriggerPayloadValidator();
@@ -526,7 +526,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NullSdkIndex_NoDiagnostic()
+    public async Task ValidateAsync_NullSdkIndex_NoDiagnosticAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -559,7 +559,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_EmptyDocument_NoDiagnostic()
+    public async Task ValidateAsync_EmptyDocument_NoDiagnosticAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -577,7 +577,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_DiagnosticRangeOnTypeArgument_PreciseRange()
+    public async Task ValidateAsync_DiagnosticRangeOnTypeArgument_PreciseRangeAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -620,7 +620,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_MultipleDeserializeCalls_EmitsMultipleDiagnostics()
+    public async Task ValidateAsync_MultipleDeserializeCalls_EmitsMultipleDiagnosticsAsync()
     {
         // Arrange
         var validator = new TriggerPayloadValidator();
@@ -657,7 +657,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NonDeserializeGenericMethod_NoDiagnostic()
+    public async Task ValidateAsync_NonDeserializeGenericMethod_NoDiagnosticAsync()
     {
         // Arrange — generic method that is NOT a deserialization call
         var validator = new TriggerPayloadValidator();
@@ -692,7 +692,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_OperationNameDifferentCasing_ResolvesCorrectly()
+    public async Task ValidateAsync_OperationNameDifferentCasing_ResolvesCorrectlyAsync()
     {
         // Arrange — operation name uses different casing than the canonical FieldName.
         // The validator should normalize it and still find the expected payload type.
@@ -727,7 +727,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_FullyQualifiedCorrectType_NoDiagnostic()
+    public async Task ValidateAsync_FullyQualifiedCorrectType_NoDiagnosticAsync()
     {
         // Arrange — fully-qualified type argument should match the expected payload type
         var validator = new TriggerPayloadValidator();
@@ -741,7 +741,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
@@ -761,7 +761,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_FullyQualifiedWeakType_EmitsCSdk201()
+    public async Task ValidateAsync_FullyQualifiedWeakType_EmitsCSdk201Async()
     {
         // Arrange — fully-qualified weak type (System.Text.Json.JsonElement)
         var validator = new TriggerPayloadValidator();
@@ -797,7 +797,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConditionalAccessDeserialize_NoDiagnostic()
+    public async Task ValidateAsync_ConditionalAccessDeserialize_NoDiagnosticAsync()
     {
         // Arrange — conditional access deserialization is skipped entirely because
         // known serializer types (JsonSerializer, JsonConvert) are static classes and
@@ -836,7 +836,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_LocalTypeShadowsSerializer_NoDiagnostic()
+    public async Task ValidateAsync_LocalTypeShadowsSerializer_NoDiagnosticAsync()
     {
         // Arrange — file declares a class named "JsonSerializer" that shadows the imported type.
         // The simple-name receiver should not be treated as a known serializer.
@@ -875,7 +875,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_LocalVariableShadowsSerializer_NoDiagnostic()
+    public async Task ValidateAsync_LocalVariableShadowsSerializer_NoDiagnosticAsync()
     {
         // Arrange — a local variable named "JsonSerializer" shadows the imported type.
         // The validator should not treat it as a known serializer receiver.
@@ -911,7 +911,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_AliasUsingDirective_NoDiagnostic()
+    public async Task ValidateAsync_AliasUsingDirective_NoDiagnosticAsync()
     {
         // Arrange — alias directive "using STJ = System.Text.Json;" does not bring
         // JsonSerializer into scope by simple name. The validator should not treat
@@ -947,7 +947,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_SimpleNameUsingStatic_EmitsCSdk201()
+    public async Task ValidateAsync_SimpleNameUsingStatic_EmitsCSdk201Async()
     {
         // Arrange — "using System.Text.Json; using static JsonSerializer;" is valid C#
         // because the namespace import makes JsonSerializer resolvable.
@@ -985,7 +985,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_UsingStaticDirectCall_EmitsCSdk201()
+    public async Task ValidateAsync_UsingStaticDirectCall_EmitsCSdk201Async()
     {
         // Arrange — using static System.Text.Json.JsonSerializer enables bare Deserialize<T>() calls
         var validator = new TriggerPayloadValidator();
@@ -1021,7 +1021,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_GlobalQualifiedCorrectType_NoDiagnostic()
+    public async Task ValidateAsync_GlobalQualifiedCorrectType_NoDiagnosticAsync()
     {
         // Arrange — global:: prefixed fully-qualified type should match correctly
         var validator = new TriggerPayloadValidator();
@@ -1035,7 +1035,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<global::Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<global::Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute
@@ -1055,7 +1055,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_GlobalQualifiedUsingNamespace_EmitsCSdk201()
+    public async Task ValidateAsync_GlobalQualifiedUsingNamespace_EmitsCSdk201Async()
     {
         // Arrange — using global::System.Text.Json; should be normalized to System.Text.Json
         // so that JsonSerializer is recognized as a known serializer receiver.
@@ -1092,7 +1092,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NestedSdkType_EmitsCSdk200()
+    public async Task ValidateAsync_NestedSdkType_EmitsCSdk200Async()
     {
         // Arrange — SDK type names use '+' for nested types (e.g., "Namespace.Outer+Inner"),
         // but C# source code uses '.' (e.g., "Outer.Inner"). BuildTypeNameLookup extracts
@@ -1102,17 +1102,17 @@ public class TriggerPayloadValidatorTests
         SdkIndex nestedSdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.Outer+WrongTriggerPayload",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -1147,7 +1147,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_NamespaceScopedUsing_EmitsCSdk201()
+    public async Task ValidateAsync_NamespaceScopedUsing_EmitsCSdk201Async()
     {
         // Arrange — using directive inside a namespace declaration should still be detected.
         var validator = new TriggerPayloadValidator();
@@ -1186,7 +1186,7 @@ public class TriggerPayloadValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_FullyQualifiedNestedTypeInSource_EmitsCSdk200()
+    public async Task ValidateAsync_FullyQualifiedNestedTypeInSource_EmitsCSdk200Async()
     {
         // Arrange — source uses the fully-qualified dotted form for a nested type
         // (Microsoft.Azure...Outer.WrongTriggerPayload). BuildTypeNameLookup adds
@@ -1195,17 +1195,17 @@ public class TriggerPayloadValidatorTests
         SdkIndex nestedSdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
-                new SdkConstant("Office365", "office365", "ConnectorNames", "Microsoft.Azure.Connectors.Sdk.ConnectorNames"),
+                new SdkConstant("Office365", "office365", "ConnectorNames", "Azure.Connectors.Sdk.ConnectorNames"),
             },
             triggerOperations: new Dictionary<string, ImmutableArray<SdkConstant>>
             {
                 ["office365"] = ImmutableArray.Create(
-                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Microsoft.Azure.Connectors.DirectClient.Office365.Office365TriggerOperations")),
+                    new SdkConstant("OnNewEmail", "OnNewEmail", "Office365TriggerOperations", "Azure.Connectors.Sdk.Office365.Office365TriggerOperations")),
             },
             typeNames: new[]
             {
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Office365OnNewEmailTriggerPayload",
-                "Microsoft.Azure.Connectors.DirectClient.Office365.Outer+WrongTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.Office365OnNewEmailTriggerPayload",
+                "Azure.Connectors.Sdk.Office365.Outer+WrongTriggerPayload",
             });
         var uri = DocumentUri.From("file:///test.cs");
         string code = """
@@ -1216,7 +1216,7 @@ public class TriggerPayloadValidatorTests
                 [ConnectorTriggerMetadata(ConnectorName = "office365", OperationName = "OnNewEmail")]
                 public async Task MyMethod()
                 {
-                    var payload = JsonSerializer.Deserialize<Microsoft.Azure.Connectors.DirectClient.Office365.Outer.WrongTriggerPayload>(body);
+                    var payload = JsonSerializer.Deserialize<Azure.Connectors.Sdk.Office365.Outer.WrongTriggerPayload>(body);
                 }
             }
             public sealed class ConnectorTriggerMetadataAttribute : Attribute

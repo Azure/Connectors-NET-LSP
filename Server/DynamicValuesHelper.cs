@@ -91,7 +91,7 @@ internal static class DynamicValuesHelper
 
     /// <summary>
     /// Infers the connector name from a method's containing type by stripping known suffixes.
-    /// For example: SharepointonlineClient -> sharepointonline, TeamsClient -> teams.
+    /// For example: SharePointOnlineClient -> sharepointonline, TeamsClient -> teams.
     /// </summary>
     public static string? InferConnectorFromContainingType(string? containingTypeName)
     {
