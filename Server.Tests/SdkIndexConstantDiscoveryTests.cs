@@ -31,30 +31,38 @@ public class SdkIndexConstantDiscoveryTests
     {
         _ = context;
 
-        // Use the SDK nupkg bundled with the LSP server
-        string nupkgPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "..",
-            "..",
-            "..",
-            "..",
-            "SDK",
-            "Azure.Connectors.Sdk.1.0.0.nupkg");
+        // Discover the SDK nupkg by glob pattern so the test survives version changes.
+        string? nupkgPath = FindSdkNupkg(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "SDK"));
 
-        if (!File.Exists(nupkgPath))
+        if (nupkgPath is null)
         {
             // CI builds may use a different relative path
-            nupkgPath = Path.GetFullPath(Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "..",
-                "..",
-                "..",
-                "..",
-                "SDK",
-                "Azure.Connectors.Sdk.1.0.0.nupkg"));
+            nupkgPath = FindSdkNupkg(Path.GetFullPath(Path.Combine(
+                Directory.GetCurrentDirectory(), "..", "..", "..", "..", "SDK")));
         }
 
-        sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);
+        if (nupkgPath is not null)
+        {
+            sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);
+        }
+    }
+
+    private static string? FindSdkNupkg(string sdkDirectory)
+    {
+        var sdkDir = new DirectoryInfo(sdkDirectory);
+        if (!sdkDir.Exists)
+        {
+            return null;
+        }
+
+        // Pick the newest Azure.Connectors.Sdk*.nupkg to handle version changes.
+        FileInfo? nupkg = sdkDir
+            .GetFiles("Azure.Connectors.Sdk*.nupkg", SearchOption.TopDirectoryOnly)
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .FirstOrDefault();
+
+        return nupkg?.FullName;
     }
 
     [TestMethod]
