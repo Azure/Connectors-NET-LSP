@@ -220,7 +220,9 @@ public class SdkIndexConstantDiscoveryTests
         Assert.IsTrue(dllPaths.Length > 0, "Should have at least one SDK assembly");
 
         // Create a second index from the DLL paths directly
-        var assemblyIndex = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync(dllPaths);
+        var assemblyIndex = await SdkLspServer.SdkIndex
+            .TryCreateFromAssembliesAsync(dllPaths)
+            .ConfigureAwait(continueOnCapturedContext: false);
         Assert.IsNotNull(assemblyIndex, "TryCreateFromAssembliesAsync should succeed for valid DLL paths");
 
         // Verify same connector constants are discovered
@@ -243,7 +245,9 @@ public class SdkIndexConstantDiscoveryTests
     [TestMethod]
     public async Task TryCreateFromAssembliesAsync_NonexistentPath_ReturnsNullAsync()
     {
-        var result = await SdkLspServer.SdkIndex.TryCreateFromAssembliesAsync("/nonexistent/path.dll");
+        var result = await SdkLspServer.SdkIndex
+            .TryCreateFromAssembliesAsync("/nonexistent/path.dll")
+            .ConfigureAwait(continueOnCapturedContext: false);
         Assert.IsNull(result);
     }
 }
