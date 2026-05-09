@@ -44,7 +44,9 @@ public class SdkIndexConstantDiscoveryTests
 
         if (nupkgPath is not null)
         {
-            sdkIndex = await SdkLspServer.SdkIndex.TryCreateAsync(nupkgPath);
+            sdkIndex = await SdkLspServer.SdkIndex
+                .TryCreateAsync(nupkgPath)
+                .ConfigureAwait(continueOnCapturedContext: false);
         }
     }
 
