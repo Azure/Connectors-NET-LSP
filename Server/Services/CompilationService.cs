@@ -23,8 +23,9 @@ public sealed class CompilationService
     private readonly SdkIndex? sdkIndex;
 
     // Cache: one entry per document URI, evicts previous version on text change.
-    // Validity is checked via (textLength, textHashCode) to avoid hash-only collisions.
-    private readonly ConcurrentDictionary<string, (int Length, int Hash, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
+    // Validity is checked via (textLength, textHashCode, projectDirectory) to avoid hash-only collisions
+    // and ensure NuGet references match.
+    private readonly ConcurrentDictionary<string, (int Length, int Hash, string? ProjectDirectory, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompilationService"/> class.
@@ -53,11 +54,20 @@ public sealed class CompilationService
         string sourceText = syntaxTree.ToString();
         int textLength = sourceText.Length;
         int textHash = sourceText.GetHashCode(StringComparison.Ordinal);
+        string? projectDirectory = !string.IsNullOrEmpty(filePath) ? FindProjectDirectory(filePath) : null;
 
         if (this.cache.TryGetValue(uriKey, out var cached) &&
             cached.Length == textLength &&
-            cached.Hash == textHash)
+            cached.Hash == textHash &&
+            string.Equals(cached.ProjectDirectory, projectDirectory, StringComparison.OrdinalIgnoreCase))
         {
+            // Fast path: if the caller passed the exact same SyntaxTree instance,
+            // return the cached compilation and semantic model directly.
+            if (ReferenceEquals(syntaxTree, cached.Compilation.SyntaxTrees.First()))
+            {
+                return (cached.Compilation, cached.Model);
+            }
+
             // The cached compilation used a tree with identical text.
             // Replace the tree in the compilation so the returned SemanticModel
             // belongs to the caller's SyntaxTree instance.
@@ -87,7 +97,7 @@ public sealed class CompilationService
         SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
         // Store with the current tree; replaces any prior entry for this URI.
-        this.cache[uriKey] = (textLength, textHash, compilation, semanticModel);
+        this.cache[uriKey] = (textLength, textHash, projectDirectory, compilation, semanticModel);
 
         return (compilation, semanticModel);
     }
@@ -163,7 +173,7 @@ public sealed class CompilationService
         {
             references.Add(MetadataReference.CreateFromFile(normalized));
         }
-        catch
+        catch (Exception ex) when (!ex.IsFatal())
         {
         }
     }
