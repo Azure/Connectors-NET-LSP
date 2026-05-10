@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -22,7 +23,7 @@ namespace SdkLspServer.Handlers.CompletionHandler;
 /// (e.g., Msnweather) based on the SDK assemblies loaded via <see cref="SdkIndex"/>.
 /// Can also make dynamic API calls to fetch additional completion suggestions.
 /// </summary>
-public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService) : CompletionHandlerBase
+public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService, Services.CompilationService compilationService) : CompletionHandlerBase
 {
     private readonly SdkIndex? sdkIndex = sdkIndex;
     private readonly BufferManager bufferManager = bufferManager;
@@ -30,6 +31,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     private readonly ApiService apiService = apiService;
     private readonly LSPStore lspStore = lspStore;
     private readonly ITelemetryService telemetry = telemetryService;
+    private readonly Services.CompilationService compilationService = compilationService;
     private int completionRequestCount = 0;
 
     public TextDocumentSelector DocumentSelector { get; } = new(
@@ -109,7 +111,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             if (request.Context?.TriggerKind == CompletionTriggerKind.TriggerCharacter &&
                 (request.Context?.TriggerCharacter == "(" || request.Context?.TriggerCharacter == ","))
             {
-                List<CompletionItem>? argCompletions = await HandleArgumentPositionDynamicValuesAsync(root, absolutePosition, tree, cancellationToken);
+                List<CompletionItem>? argCompletions = await HandleArgumentPositionDynamicValuesAsync(root, absolutePosition, tree, request.TextDocument.Uri, cancellationToken);
                 return new CompletionList(argCompletions ?? new List<CompletionItem>());
             }
 
@@ -143,7 +145,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 }
 
                 // If not connection, try dynamic values completion
-                List<CompletionItem>? dynamicCompletions = await HandleDynamicValuesCompletionAsync(stringToken, tree, cancellationToken);
+                List<CompletionItem>? dynamicCompletions = await HandleDynamicValuesCompletionAsync(stringToken, tree, request.TextDocument.Uri, cancellationToken);
                 if (dynamicCompletions?.Any() == true)
                 {
                     return new CompletionList(dynamicCompletions);
@@ -168,7 +170,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
 
             if (isInArgumentList)
             {
-                List<CompletionItem>? argDynamicCompletions = await HandleArgumentPositionDynamicValuesAsync(root, absolutePosition, tree, cancellationToken);
+                List<CompletionItem>? argDynamicCompletions = await HandleArgumentPositionDynamicValuesAsync(root, absolutePosition, tree, request.TextDocument.Uri, cancellationToken);
                 if (argDynamicCompletions?.Count > 0)
                 {
                     return new CompletionList(argDynamicCompletions);
@@ -204,37 +206,10 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             }
 
             // Create a small compilation so Roslyn can tell us the return type of GetManagedConnectors()
-            var references = new List<MetadataReference>
-            {
-                MetadataReference.CreateFromFile(typeof(string).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(System.Console).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location),
-            };
-
-            if (sdkIndex != null)
-            {
-                foreach (string assemblyPath in sdkIndex.AssemblyPaths)
-                {
-                    try
-                    {
-                        if (File.Exists(assemblyPath))
-                        {
-                            references.Add(MetadataReference.CreateFromFile(assemblyPath));
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore assembly loading issues.
-                    }
-                }
-            }
-
-            var compilation = CSharpCompilation.Create(
-                assemblyName: "CompletionAnalysis",
-                syntaxTrees: new[] { tree },
-                references: references);
-
-            SemanticModel semanticModel = compilation.GetSemanticModel(tree);
+            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+                .GetCompilation(
+                    request.TextDocument.Uri.ToUri(),
+                    documentText);
 
             // Get the type of the target expression (could be the result of GetManagedConnectors(), or a connector like Outlook)
             TypeInfo typeInfo = semanticModel.GetTypeInfo(targetExpr, cancellationToken);
@@ -1211,7 +1186,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// Handles completion when the cursor is inside a string literal that's part of a parameter with [DynamicValues].
     /// Supports both lambda-wrapped parameters and direct string arguments in method calls.
     /// </summary>
-    private async Task<List<CompletionItem>?> HandleDynamicValuesCompletionAsync(SyntaxToken stringToken, SyntaxTree tree, CancellationToken cancellationToken)
+    private async Task<List<CompletionItem>?> HandleDynamicValuesCompletionAsync(SyntaxToken stringToken, SyntaxTree tree, DocumentUri documentUri, CancellationToken cancellationToken)
     {
         try
         {
@@ -1250,13 +1225,10 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             int argumentIndex = argumentList.Arguments.IndexOf(argument);
 
             // Build a semantic model
-            List<MetadataReference> references = BuildMetadataReferences();
-            var compilation = CSharpCompilation.Create(
-                assemblyName: "DynamicValuesCompletion",
-                syntaxTrees: new[] { tree },
-                references: references);
-
-            SemanticModel semanticModel = compilation.GetSemanticModel(tree);
+            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+                .GetCompilation(
+                    documentUri.ToUri(),
+                    tree.ToString());
 
             // Get the method symbol being invoked
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
@@ -1359,6 +1331,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
         CompilationUnitSyntax root,
         int absolutePosition,
         SyntaxTree tree,
+        DocumentUri documentUri,
         CancellationToken cancellationToken)
     {
         try
@@ -1419,13 +1392,11 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             }
 
             // Build compilation to resolve the method symbol
-            List<MetadataReference> references = BuildMetadataReferences();
-            var compilation = CSharpCompilation.Create(
-                assemblyName: "ArgPositionCompletion",
-                syntaxTrees: new[] { tree },
-                references: references);
+            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+                .GetCompilation(
+                    documentUri.ToUri(),
+                    tree.ToString());
 
-            SemanticModel semanticModel = compilation.GetSemanticModel(tree);
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
             IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol
                 ?? symbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
@@ -1632,36 +1603,6 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
         }
 
         return items;
-    }
-
-    private List<MetadataReference> BuildMetadataReferences()
-    {
-        var references = new List<MetadataReference>
-        {
-            MetadataReference.CreateFromFile(typeof(string).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
-        };
-
-        if (sdkIndex != null)
-        {
-            foreach (string assemblyPath in sdkIndex.AssemblyPaths)
-            {
-                try
-                {
-                    if (File.Exists(assemblyPath))
-                    {
-                        references.Add(MetadataReference.CreateFromFile(assemblyPath));
-                    }
-                }
-                catch
-                {
-                    // Ignore
-                }
-            }
-        }
-
-        return references;
     }
 
     private static string? InferConnectorName(string operationName, IMethodSymbol? methodSymbol)

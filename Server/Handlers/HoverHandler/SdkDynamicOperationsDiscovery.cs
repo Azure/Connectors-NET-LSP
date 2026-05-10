@@ -21,8 +21,10 @@ internal static partial class SdkDynamicOperationsDiscovery
     /// <summary>
     /// Discovers all dynamic operations from the SDK assemblies using Roslyn's metadata API.
     /// </summary>
+    /// <param name="sdkIndex">The SDK index. Used as a null check only; compilation is delegated to <paramref name="compilationService"/>.</param>
+    /// <param name="compilationService">The shared compilation service used to create SDK metadata compilations.</param>
     /// <returns>A dictionary of discovered dynamic operations where the key is in the format "connector:operation" and the value contains the operation metadata.</returns>
-    public static Dictionary<string, DynamicOperationMetadata> DiscoverOperations(SdkIndex? sdkIndex)
+    public static Dictionary<string, DynamicOperationMetadata> DiscoverOperations(SdkIndex? sdkIndex, Services.CompilationService? compilationService)
     {
         lock (LockObject)
         {
@@ -42,7 +44,9 @@ internal static partial class SdkDynamicOperationsDiscovery
             // Create a Roslyn compilation to access SDK metadata
             try
             {
-                CSharpCompilation compilation = CreateCompilationWithSdk(sdkIndex);
+                CSharpCompilation compilation = compilationService != null
+                    ? compilationService.CreateSdkMetadataCompilation()
+                    : CreateCompilationWithSdk(sdkIndex);
                 DiscoverFromCompilation(compilation, cachedOperations);
             }
             catch (Exception ex) when (!ex.IsFatal())

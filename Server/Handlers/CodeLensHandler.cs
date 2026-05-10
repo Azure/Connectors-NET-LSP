@@ -21,12 +21,13 @@ namespace SdkLspServer.Handlers;
 /// for SDK methods and types. CodeLens items appear as clickable text above methods
 /// and provide quick actions like documentation links and usage examples.
 /// </summary>
-public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, CodeLensConfig codeLensConfig, ITelemetryService telemetryService) : CodeLensHandlerBase
+public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, CodeLensConfig codeLensConfig, ITelemetryService telemetryService, Services.CompilationService compilationService) : CodeLensHandlerBase
 {
     private readonly SdkIndex? sdkIndex = sdkIndex;
     private readonly BufferManager bufferManager = bufferManager;
     private readonly CodeLensConfig codeLensConfig = codeLensConfig;
     private readonly ITelemetryService telemetry = telemetryService;
+    private readonly Services.CompilationService compilationService = compilationService;
     private int codeLensRequestCount = 0;
 
     // Concise short type format (e.g., string, int, List<T>) without namespaces
@@ -260,117 +261,6 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
             string.Equals(a.AttributeClass?.Name, "Agent", StringComparison.Ordinal));
     }
 
-    private static void AddCoreReferences(List<MetadataReference> references, HashSet<string> seenPaths)
-    {
-        TryAddReference(references, seenPaths, typeof(string).Assembly.Location);
-        TryAddReference(references, seenPaths, typeof(object).Assembly.Location);
-        TryAddReference(references, seenPaths, typeof(Console).Assembly.Location);
-        TryAddReference(references, seenPaths, typeof(Enumerable).Assembly.Location);
-        TryAddReference(references, seenPaths, typeof(Task).Assembly.Location);
-
-        TryAddTrustedReference(references, seenPaths, "netstandard.dll");
-        TryAddTrustedReference(references, seenPaths, "System.Runtime.dll");
-        TryAddTrustedReference(references, seenPaths, "System.Collections.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Abstractions.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Primitives.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Configuration.Abstractions.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.DependencyInjection.Abstractions.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Logging.Abstractions.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Options.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Hosting.Abstractions.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Hosting.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.DependencyInjection.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Configuration.dll");
-        TryAddTrustedReference(references, seenPaths, "Microsoft.Extensions.Logging.dll");
-    }
-
-    private static string? TryGetTrustedAssemblyPath(string assemblyFile)
-    {
-        if (string.IsNullOrWhiteSpace(assemblyFile))
-        {
-            return null;
-        }
-
-        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string tpaList)
-        {
-            foreach (string candidate in tpaList.Split(Path.PathSeparator))
-            {
-                try
-                {
-                    if (string.Equals(Path.GetFileName(candidate), assemblyFile, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return candidate;
-                    }
-                }
-                catch
-                {
-                    // Ignore malformed entries.
-                }
-            }
-        }
-
-        try
-        {
-            string runtimeDir = RuntimeEnvironment.GetRuntimeDirectory();
-            if (!string.IsNullOrEmpty(runtimeDir))
-            {
-                string candidate = Path.Combine(runtimeDir, assemblyFile);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            string coreLibPath = typeof(object).Assembly.Location;
-            if (!string.IsNullOrEmpty(coreLibPath))
-            {
-                string? directory = Path.GetDirectoryName(coreLibPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    string candidate = Path.Combine(directory, assemblyFile);
-                    if (File.Exists(candidate))
-                    {
-                        return candidate;
-                    }
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        return null;
-    }
-
-    private static void TryAddReference(List<MetadataReference> references, HashSet<string> seenPaths, string? assemblyPath)
-    {
-        if (string.IsNullOrWhiteSpace(assemblyPath))
-        {
-            return;
-        }
-
-        string normalized = Path.GetFullPath(assemblyPath);
-        if (!File.Exists(normalized) || !seenPaths.Add(normalized))
-        {
-            return;
-        }
-
-        try
-        {
-            references.Add(MetadataReference.CreateFromFile(normalized));
-        }
-        catch
-        {
-            // Skip references that cannot be loaded.
-        }
-    }
-
     private static string? TryInferConnectorName(InvocationExpressionSyntax invocation)
     {
         if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess)
@@ -436,12 +326,6 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
             Start = new Position(lineSpan.StartLinePosition.Line, lineSpan.StartLinePosition.Character),
             End = new Position(lineSpan.EndLinePosition.Line, lineSpan.EndLinePosition.Character),
         };
-    }
-
-    private static void TryAddTrustedReference(List<MetadataReference> references, HashSet<string> seenPaths, string assemblyFile)
-    {
-        string? path = TryGetTrustedAssemblyPath(assemblyFile);
-        TryAddReference(references, seenPaths, path);
     }
 
     private static OmniSharp.Extensions.LanguageServer.Protocol.Models.Range GetFirstParameterLocation(InvocationExpressionSyntax invocation, SyntaxTree tree)
@@ -643,26 +527,10 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
             SyntaxTree tree = CSharpSyntaxTree.ParseText(documentText);
             CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
 
-            var references = new List<MetadataReference>();
-            var referencePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            AddCoreReferences(references, referencePaths);
-
-            // Add SDK assembly references if available
-            if (sdkIndex != null)
-            {
-                foreach (string assemblyPath in sdkIndex.AssemblyPaths)
-                {
-                    TryAddReference(references, referencePaths, assemblyPath);
-                }
-            }
-
-            var compilation = CSharpCompilation.Create(
-                "CodeLensAnalysis",
-                new[] { tree },
-                references);
-
-            SemanticModel semanticModel = compilation.GetSemanticModel(tree);
+            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+                .GetCompilation(
+                    documentUri.ToUri(),
+                    documentText);
 
             // Find method invocations that might be SDK-related
             IEnumerable<InvocationExpressionSyntax> invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>();
