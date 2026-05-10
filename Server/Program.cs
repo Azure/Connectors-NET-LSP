@@ -317,6 +317,9 @@ internal static class Program
         // Register ApiService for handlers to use
         services.AddSingleton<ApiService>();
 
+        // Register CompilationService for shared Roslyn compilation caching
+        services.AddSingleton<Services.CompilationService>();
+
         // Register TelemetryService for telemetry tracking
         services.AddSingleton<ITelemetryService, TelemetryService>();
 

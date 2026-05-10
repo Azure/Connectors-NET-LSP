@@ -18,13 +18,14 @@ using SdkLspServer.Diagnostics;
 
 namespace SdkLspServer.Handlers;
 
-internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManager bufferManager, SdkIndex? sdkIndex, DiagnosticPublisher diagnosticPublisher)
+internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManager bufferManager, SdkIndex? sdkIndex, DiagnosticPublisher diagnosticPublisher, Services.CompilationService compilationService)
     : IDidChangeTextDocumentHandler, IDidOpenTextDocumentHandler, IDidSaveTextDocumentHandler, IDidCloseTextDocumentHandler
 {
     private readonly ILanguageServerFacade router = router;
     private readonly BufferManager bufferManager = bufferManager;
     private readonly SdkIndex? sdkIndex = sdkIndex;
     private readonly DiagnosticPublisher diagnosticPublisher = diagnosticPublisher;
+    private readonly Services.CompilationService compilationService = compilationService;
 
     public TextDocumentSyncKind Change { get; } = TextDocumentSyncKind.Full;
 
@@ -80,7 +81,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         bufferManager.UpdateBuffer(documentPath, text ?? string.Empty);
 
         // If the change likely introduced SDK usage, ask client to refresh CodeLens
-        if (!string.IsNullOrEmpty(text) && MightContainSdkUsage(text))
+        if (!string.IsNullOrEmpty(text) && MightContainSdkUsage(text, request.TextDocument.Uri.ToUri()))
         {
             TryRequestCodeLensRefresh(router);
         }
@@ -97,7 +98,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
     public async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         bufferManager.UpdateBuffer(request.TextDocument.Uri.ToString(), request.TextDocument.Text);
-        if (!string.IsNullOrEmpty(request.TextDocument.Text) && MightContainSdkUsage(request.TextDocument.Text))
+        if (!string.IsNullOrEmpty(request.TextDocument.Text) && MightContainSdkUsage(request.TextDocument.Text, request.TextDocument.Uri.ToUri()))
         {
             TryRequestCodeLensRefresh(router);
         }
@@ -214,12 +215,12 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         };
     }
 
-    private bool MightContainSdkUsage(string text)
+    private bool MightContainSdkUsage(string text, Uri documentUri)
     {
         // Prefer a fast, semantic check via Roslyn. If that fails, fall back to a quick substring heuristic.
         try
         {
-            if (MightContainSdkUsageRoslyn(text))
+            if (MightContainSdkUsageRoslyn(text, documentUri))
             {
                 return true;
             }
@@ -242,7 +243,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         }
     }
 
-    private bool MightContainSdkUsageRoslyn(string documentText)
+    private bool MightContainSdkUsageRoslyn(string documentText, Uri documentUri)
     {
         // Parse
         SyntaxTree tree = CSharpSyntaxTree.ParseText(documentText);
@@ -255,72 +256,14 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         }
 
         // Create minimal compilation
-        var references = new List<MetadataReference>();
-
-        // Use AppContext.BaseDirectory for single-file deployment compatibility
-        string baseDir = AppContext.BaseDirectory;
-
-        try
-        {
-            // Try to add basic runtime references
-            string runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location) ?? baseDir;
-
-            // Add core runtime references if available
-            string[] coreRefs =
-            [
-                Path.Combine(runtimeDir, "System.Runtime.dll"),
-                Path.Combine(runtimeDir, "System.Console.dll"),
-                Path.Combine(runtimeDir, "System.Linq.dll"),
-                Path.Combine(runtimeDir, "mscorlib.dll"),
-                Path.Combine(runtimeDir, "System.Private.CoreLib.dll"),
-            ];
-
-            foreach (string refPath in coreRefs)
-            {
-                if (File.Exists(refPath))
-                {
-                    references.Add(MetadataReference.CreateFromFile(refPath));
-                }
-            }
-
-            // Fallback: use basic references from loaded assemblies if locations are available
-            Assembly[] fallbackAssemblies = [typeof(string).Assembly, typeof(Console).Assembly, typeof(Enumerable).Assembly];
-            foreach (Assembly? assembly in fallbackAssemblies)
-            {
-                if (!string.IsNullOrEmpty(assembly.Location) && File.Exists(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-        }
-        catch
-        {
-            // If all else fails, continue with empty references - Roslyn can still work for basic syntax analysis
-        }
-
-        if (sdkIndex != null)
-        {
-            foreach (string assemblyPath in sdkIndex.AssemblyPaths)
-            {
-                try
-                {
-                    if (File.Exists(assemblyPath))
-                    {
-                        references.Add(MetadataReference.CreateFromFile(assemblyPath));
-                    }
-                }
-                catch
-                {
-                }
-            }
-        }
-
-        var compilation = CSharpCompilation.Create(
-            "CodeLensRefreshScan",
-            [tree],
-            references);
-
-        SemanticModel semantic = compilation.GetSemanticModel(tree);
+        string? filePath = string.Equals(documentUri.Scheme, "file", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetFullPath(documentUri.LocalPath)
+            : null;
+        (_, SemanticModel semantic) = this.compilationService
+            .GetCompilation(
+                documentUri,
+                tree,
+                filePath);
 
         // 1) Detect direct call to GetManagedConnectors()
         foreach (InvocationExpressionSyntax inv in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
