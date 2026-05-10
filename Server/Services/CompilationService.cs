@@ -18,6 +18,10 @@ namespace SdkLspServer.Services;
 /// </summary>
 public sealed class CompilationService
 {
+    // NOTE(daviburg): These static caches are intentionally process-lifetime. The LSP server
+    // is a single-process singleton; project directories and NuGet references rarely change
+    // during a session. A future improvement could scope them to the instance or add TTL-based
+    // eviction if multi-workspace support is added.
     private static readonly ConcurrentDictionary<string, List<string>> NuGetReferenceCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string?> ProjectDirectoryCache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -402,6 +406,7 @@ public sealed class CompilationService
         }
         catch (Exception ex) when (!ex.IsFatal())
         {
+            Console.Error.WriteLine($"[CompilationService] Failed to parse {assetsPath}: {ex.Message}");
         }
 
         return result;
