@@ -51,9 +51,9 @@ public sealed class CompilationService
         string? filePath = null)
     {
         string uriKey = documentUri.ToString();
-        string sourceText = syntaxTree.ToString();
+        Microsoft.CodeAnalysis.Text.SourceText sourceText = syntaxTree.GetText();
         int textLength = sourceText.Length;
-        int textHash = sourceText.GetHashCode(StringComparison.Ordinal);
+        int textHash = sourceText.ToString().GetHashCode(StringComparison.Ordinal);
         string? projectDirectory = !string.IsNullOrEmpty(filePath) ? FindProjectDirectory(filePath) : null;
 
         if (this.cache.TryGetValue(uriKey, out var cached) &&
@@ -210,7 +210,7 @@ public sealed class CompilationService
                         return candidate;
                     }
                 }
-                catch
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                 }
             }
@@ -228,7 +228,7 @@ public sealed class CompilationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (!ex.IsFatal())
         {
         }
 
@@ -248,7 +248,7 @@ public sealed class CompilationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (!ex.IsFatal())
         {
         }
 
@@ -400,7 +400,7 @@ public sealed class CompilationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (!ex.IsFatal())
         {
         }
 

@@ -256,10 +256,12 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         }
 
         // Create minimal compilation
+        string? filePath = documentUri.Scheme == "file" ? documentUri.LocalPath : null;
         (CSharpCompilation compilation, SemanticModel semantic) = this.compilationService
             .GetCompilation(
                 documentUri,
-                tree);
+                tree,
+                filePath);
 
         // 1) Detect direct call to GetManagedConnectors()
         foreach (InvocationExpressionSyntax inv in root.DescendantNodes().OfType<InvocationExpressionSyntax>())

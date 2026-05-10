@@ -206,10 +206,12 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             }
 
             // Create a small compilation so Roslyn can tell us the return type of GetManagedConnectors()
+            string? completionFilePath = request.TextDocument.Uri.Scheme == "file" ? request.TextDocument.Uri.GetFileSystemPath() : null;
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     request.TextDocument.Uri.ToUri(),
-                    tree);
+                    tree,
+                    completionFilePath);
 
             // Get the type of the target expression (could be the result of GetManagedConnectors(), or a connector like Outlook)
             TypeInfo typeInfo = semanticModel.GetTypeInfo(targetExpr, cancellationToken);
@@ -1228,7 +1230,8 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    tree);
+                    tree,
+                    documentUri.Scheme == "file" ? documentUri.GetFileSystemPath() : null);
 
             // Get the method symbol being invoked
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
@@ -1395,7 +1398,8 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    tree);
+                    tree,
+                    documentUri.Scheme == "file" ? documentUri.GetFileSystemPath() : null);
 
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
             IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol
