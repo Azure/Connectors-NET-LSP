@@ -527,7 +527,7 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
             SyntaxTree tree = CSharpSyntaxTree.ParseText(documentText);
             CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
 
-            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+            (_, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
                     tree,

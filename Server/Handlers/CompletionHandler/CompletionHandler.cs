@@ -207,7 +207,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
 
             // Create a small compilation so Roslyn can tell us the return type of GetManagedConnectors()
             string? completionFilePath = request.TextDocument.Uri.Scheme == "file" ? request.TextDocument.Uri.GetFileSystemPath() : null;
-            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+            (_, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     request.TextDocument.Uri.ToUri(),
                     tree,
@@ -1227,7 +1227,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             int argumentIndex = argumentList.Arguments.IndexOf(argument);
 
             // Build a semantic model
-            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+            (_, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
                     tree,
@@ -1395,7 +1395,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             }
 
             // Build compilation to resolve the method symbol
-            (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
+            (_, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
                     tree,
