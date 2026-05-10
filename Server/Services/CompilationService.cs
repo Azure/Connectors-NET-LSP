@@ -26,7 +26,7 @@ public sealed class CompilationService
     // Cache: one entry per document URI, evicts previous version on text change.
     // Validity is checked via (textLength, contentChecksum, projectDirectory) to avoid hash-only collisions
     // and ensure NuGet references match.
-    private readonly ConcurrentDictionary<string, (int Length, string Checksum, string? ProjectDirectory, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
+    private readonly ConcurrentDictionary<string, (int Length, System.Collections.Immutable.ImmutableArray<byte> Checksum, string? ProjectDirectory, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompilationService"/> class.
@@ -54,14 +54,14 @@ public sealed class CompilationService
         string uriKey = documentUri.ToString();
         Microsoft.CodeAnalysis.Text.SourceText sourceText = syntaxTree.GetText();
         int textLength = sourceText.Length;
-        string checksum = Convert.ToHexString(sourceText.GetChecksum().AsSpan());
+        System.Collections.Immutable.ImmutableArray<byte> checksum = sourceText.GetChecksum();
         string? projectDirectory = !string.IsNullOrEmpty(filePath)
             ? ProjectDirectoryCache.GetOrAdd(filePath, FindProjectDirectory)
             : null;
 
         if (this.cache.TryGetValue(uriKey, out var cached) &&
             cached.Length == textLength &&
-            string.Equals(cached.Checksum, checksum, StringComparison.Ordinal) &&
+            cached.Checksum.AsSpan().SequenceEqual(checksum.AsSpan()) &&
             string.Equals(cached.ProjectDirectory, projectDirectory, StringComparison.OrdinalIgnoreCase))
         {
             // Fast path: if the caller passed the exact same SyntaxTree instance,
@@ -87,9 +87,9 @@ public sealed class CompilationService
         AddCoreReferences(references, seenPaths);
         this.AddSdkReferences(references, seenPaths);
 
-        if (!string.IsNullOrEmpty(filePath))
+        if (!string.IsNullOrEmpty(filePath) && projectDirectory != null)
         {
-            AddProjectNuGetReferences(references, seenPaths, filePath);
+            AddProjectNuGetReferences(references, seenPaths, projectDirectory);
         }
 
         var compilation = CSharpCompilation.Create(
@@ -262,18 +262,15 @@ public sealed class CompilationService
     /// Adds NuGet package assembly references from the project containing the document.
     /// Parses obj/project.assets.json to discover compile-time assembly paths.
     /// </summary>
-    internal static int AddProjectNuGetReferences(List<MetadataReference> references, HashSet<string> seenPaths, string documentFilePath)
+    /// <param name="references">The collection of metadata references to add to.</param>
+    /// <param name="seenPaths">A set tracking already processed assembly paths to prevent duplicates.</param>
+    /// <param name="projectDirectory">The pre-resolved project directory containing the .csproj file.</param>
+    internal static int AddProjectNuGetReferences(List<MetadataReference> references, HashSet<string> seenPaths, string projectDirectory)
     {
-        string? projectDir = FindProjectDirectory(documentFilePath);
-        if (projectDir == null)
-        {
-            return 0;
-        }
-
         // TODO(#9): NuGetReferenceCache never invalidates when project.assets.json changes
         // (e.g., after dotnet restore, package updates, or branch switches). Consider watching
         // the assets file for changes and clearing the cache entry for the affected project.
-        List<string> assemblyPaths = NuGetReferenceCache.GetOrAdd(projectDir, ResolveNuGetAssemblyPaths);
+        List<string> assemblyPaths = NuGetReferenceCache.GetOrAdd(projectDirectory, ResolveNuGetAssemblyPaths);
 
         int added = 0;
         foreach (string assemblyPath in assemblyPaths)
