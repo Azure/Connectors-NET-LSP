@@ -209,7 +209,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     request.TextDocument.Uri.ToUri(),
-                    documentText);
+                    tree);
 
             // Get the type of the target expression (could be the result of GetManagedConnectors(), or a connector like Outlook)
             TypeInfo typeInfo = semanticModel.GetTypeInfo(targetExpr, cancellationToken);
@@ -1228,7 +1228,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    tree.ToString());
+                    tree);
 
             // Get the method symbol being invoked
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
@@ -1395,7 +1395,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    tree.ToString());
+                    tree);
 
             SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken: cancellationToken);
             IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol

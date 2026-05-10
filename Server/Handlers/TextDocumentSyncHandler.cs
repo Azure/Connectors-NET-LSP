@@ -81,7 +81,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         bufferManager.UpdateBuffer(documentPath, text ?? string.Empty);
 
         // If the change likely introduced SDK usage, ask client to refresh CodeLens
-        if (!string.IsNullOrEmpty(text) && MightContainSdkUsage(text))
+        if (!string.IsNullOrEmpty(text) && MightContainSdkUsage(text, request.TextDocument.Uri.ToUri()))
         {
             TryRequestCodeLensRefresh(router);
         }
@@ -98,7 +98,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
     public async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         bufferManager.UpdateBuffer(request.TextDocument.Uri.ToString(), request.TextDocument.Text);
-        if (!string.IsNullOrEmpty(request.TextDocument.Text) && MightContainSdkUsage(request.TextDocument.Text))
+        if (!string.IsNullOrEmpty(request.TextDocument.Text) && MightContainSdkUsage(request.TextDocument.Text, request.TextDocument.Uri.ToUri()))
         {
             TryRequestCodeLensRefresh(router);
         }
@@ -215,12 +215,12 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         };
     }
 
-    private bool MightContainSdkUsage(string text)
+    private bool MightContainSdkUsage(string text, Uri documentUri)
     {
         // Prefer a fast, semantic check via Roslyn. If that fails, fall back to a quick substring heuristic.
         try
         {
-            if (MightContainSdkUsageRoslyn(text))
+            if (MightContainSdkUsageRoslyn(text, documentUri))
             {
                 return true;
             }
@@ -243,7 +243,7 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         }
     }
 
-    private bool MightContainSdkUsageRoslyn(string documentText)
+    private bool MightContainSdkUsageRoslyn(string documentText, Uri documentUri)
     {
         // Parse
         SyntaxTree tree = CSharpSyntaxTree.ParseText(documentText);
@@ -258,8 +258,8 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         // Create minimal compilation
         (CSharpCompilation compilation, SemanticModel semantic) = this.compilationService
             .GetCompilation(
-                new Uri("file:///sdkusage-detection"),
-                documentText);
+                documentUri,
+                tree);
 
         // 1) Detect direct call to GetManagedConnectors()
         foreach (InvocationExpressionSyntax inv in root.DescendantNodes().OfType<InvocationExpressionSyntax>())

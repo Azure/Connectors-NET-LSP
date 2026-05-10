@@ -530,7 +530,7 @@ public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Co
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    documentText);
+                    tree);
 
             // Find method invocations that might be SDK-related
             IEnumerable<InvocationExpressionSyntax> invocations = root.DescendantNodes().OfType<InvocationExpressionSyntax>();

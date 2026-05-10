@@ -1,3 +1,7 @@
+//------------------------------------------------------------
+// Copyright (c) Microsoft Corporation.  All rights reserved.
+//------------------------------------------------------------
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -9,20 +13,39 @@ namespace SdkLspServer.Tests;
 public class CompilationServiceTests
 {
     [TestMethod]
-    public void GetCompilation_SameSourceText_ReturnsCachedCompilation()
+    public void GetCompilation_SameTree_ReturnsCachedReferences()
     {
         // Arrange
         var service = new CompilationService(sdkIndex: null);
         var uri = new Uri("file:///test/document.cs");
-        string sourceText = "class Foo { }";
+        SyntaxTree tree = CSharpSyntaxTree.ParseText("class Foo { }");
 
         // Act
-        (CSharpCompilation first, SemanticModel firstModel) = service.GetCompilation(uri, sourceText);
-        (CSharpCompilation second, SemanticModel secondModel) = service.GetCompilation(uri, sourceText);
+        (CSharpCompilation first, SemanticModel firstModel) = service.GetCompilation(uri, tree);
+        (CSharpCompilation second, SemanticModel secondModel) = service.GetCompilation(uri, tree);
 
-        // Assert — same instance returned from cache
-        Assert.AreSame(first, second, "Expected cached compilation to be returned for identical source text.");
-        Assert.AreSame(firstModel, secondModel, "Expected cached semantic model to be returned for identical source text.");
+        // Assert — same references reused (compilation is replaced with caller's tree each time)
+        Assert.IsTrue(
+            first.References.SequenceEqual(second.References),
+            "Expected cached references to be reused for identical source text.");
+    }
+
+    [TestMethod]
+    public void GetCompilation_SameText_DifferentTree_ReturnsModelForCallerTree()
+    {
+        // Arrange
+        var service = new CompilationService(sdkIndex: null);
+        var uri = new Uri("file:///test/document.cs");
+        SyntaxTree treeA = CSharpSyntaxTree.ParseText("class Foo { }");
+        SyntaxTree treeB = CSharpSyntaxTree.ParseText("class Foo { }");
+
+        // Act
+        (CSharpCompilation _, SemanticModel modelA) = service.GetCompilation(uri, treeA);
+        (CSharpCompilation _, SemanticModel modelB) = service.GetCompilation(uri, treeB);
+
+        // Assert — semantic model must belong to the caller's tree instance
+        Assert.AreSame(treeA, modelA.SyntaxTree, "SemanticModel should use the caller's SyntaxTree (A).");
+        Assert.AreSame(treeB, modelB.SyntaxTree, "SemanticModel should use the caller's SyntaxTree (B).");
     }
 
     [TestMethod]
@@ -31,12 +54,12 @@ public class CompilationServiceTests
         // Arrange
         var service = new CompilationService(sdkIndex: null);
         var uri = new Uri("file:///test/document.cs");
-        string sourceTextA = "class Foo { }";
-        string sourceTextB = "class Bar { }";
+        SyntaxTree treeA = CSharpSyntaxTree.ParseText("class Foo { }");
+        SyntaxTree treeB = CSharpSyntaxTree.ParseText("class Bar { }");
 
         // Act
-        (CSharpCompilation first, SemanticModel _) = service.GetCompilation(uri, sourceTextA);
-        (CSharpCompilation second, SemanticModel _) = service.GetCompilation(uri, sourceTextB);
+        (CSharpCompilation first, SemanticModel _) = service.GetCompilation(uri, treeA);
+        (CSharpCompilation second, SemanticModel _) = service.GetCompilation(uri, treeB);
 
         // Assert — different compilation because source text changed
         Assert.AreNotSame(first, second, "Expected a new compilation when source text changes.");
@@ -48,10 +71,10 @@ public class CompilationServiceTests
         // Arrange
         var service = new CompilationService(sdkIndex: null);
         var uri = new Uri("file:///test/document.cs");
-        string sourceText = "using System; class Foo { void M() { Console.WriteLine(); } }";
+        SyntaxTree tree = CSharpSyntaxTree.ParseText("using System; class Foo { void M() { Console.WriteLine(); } }");
 
         // Act
-        (CSharpCompilation compilation, SemanticModel _) = service.GetCompilation(uri, sourceText);
+        (CSharpCompilation compilation, SemanticModel _) = service.GetCompilation(uri, tree);
 
         // Assert — compilation should have metadata references (core .NET assemblies)
         Assert.IsTrue(
@@ -72,19 +95,19 @@ public class CompilationServiceTests
     }
 
     [TestMethod]
-    public void GetCompilation_SemanticModelIsUsable()
+    public void GetCompilation_SemanticModelUsesCallerTree()
     {
         // Arrange
         var service = new CompilationService(sdkIndex: null);
         var uri = new Uri("file:///test/document.cs");
-        string sourceText = "class Foo { int Bar = 42; }";
+        SyntaxTree tree = CSharpSyntaxTree.ParseText("class Foo { int Bar = 42; }");
 
         // Act
-        (CSharpCompilation _, SemanticModel model) = service.GetCompilation(uri, sourceText);
+        (CSharpCompilation _, SemanticModel model) = service.GetCompilation(uri, tree);
 
-        // Assert — the semantic model should be able to resolve syntax
-        SyntaxTree tree = model.SyntaxTree;
-        SyntaxNode root = tree.GetRoot();
+        // Assert — the semantic model must reference the caller's tree
+        Assert.AreSame(tree, model.SyntaxTree, "SemanticModel should reference the caller's SyntaxTree.");
+        SyntaxNode root = model.SyntaxTree.GetRoot();
         Assert.IsNotNull(root, "Expected syntax tree root to be non-null.");
     }
 
@@ -111,14 +134,35 @@ public class CompilationServiceTests
         var service = new CompilationService(sdkIndex: null);
         var uriA = new Uri("file:///test/a.cs");
         var uriB = new Uri("file:///test/b.cs");
-        string sourceText = "class Foo { }";
+        SyntaxTree treeA = CSharpSyntaxTree.ParseText("class Foo { }");
+        SyntaxTree treeB = CSharpSyntaxTree.ParseText("class Foo { }");
 
         // Act
-        (CSharpCompilation first, SemanticModel _) = service.GetCompilation(uriA, sourceText);
-        (CSharpCompilation second, SemanticModel _) = service.GetCompilation(uriB, sourceText);
+        (CSharpCompilation first, SemanticModel _) = service.GetCompilation(uriA, treeA);
+        (CSharpCompilation second, SemanticModel _) = service.GetCompilation(uriB, treeB);
 
         // Assert — different URIs should return different cache entries
-        // (though contents are the same, they are separate documents)
         Assert.AreNotSame(first, second, "Expected separate compilations for different document URIs.");
+    }
+
+    [TestMethod]
+    public void GetCompilation_EvictsPreviousEntry_SameUri()
+    {
+        // Arrange
+        var service = new CompilationService(sdkIndex: null);
+        var uri = new Uri("file:///test/document.cs");
+        SyntaxTree treeV1 = CSharpSyntaxTree.ParseText("class V1 { }");
+        SyntaxTree treeV2 = CSharpSyntaxTree.ParseText("class V2 { }");
+
+        // Act — cache V1, then V2 for the same URI
+        service.GetCompilation(uri, treeV1);
+        (CSharpCompilation v2Compilation, SemanticModel _) = service.GetCompilation(uri, treeV2);
+
+        // Re-request V1 — should NOT be cached (evicted by V2)
+        SyntaxTree treeV1Again = CSharpSyntaxTree.ParseText("class V1 { }");
+        (CSharpCompilation v1Again, SemanticModel _) = service.GetCompilation(uri, treeV1Again);
+
+        // Assert — V1 and V2 should be different compilations (V1 was evicted)
+        Assert.AreNotSame(v2Compilation, v1Again, "V1 should have been evicted when V2 was cached.");
     }
 }

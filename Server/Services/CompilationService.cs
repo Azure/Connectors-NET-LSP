@@ -13,8 +13,8 @@ namespace SdkLspServer.Services;
 
 /// <summary>
 /// Shared service that creates and caches Roslyn <see cref="CSharpCompilation"/> instances.
-/// Compilations are cached by <c>(documentUri, sourceTextHash)</c> so that repeated
-/// requests for the same document version reuse the same immutable compilation.
+/// Compilations are cached per document URI and reused when the source text has not changed.
+/// Only the latest version per URI is retained to bound memory usage.
 /// </summary>
 public sealed class CompilationService
 {
@@ -22,8 +22,9 @@ public sealed class CompilationService
 
     private readonly SdkIndex? sdkIndex;
 
-    // Cache key: (documentUri, sourceTextHash) → (CSharpCompilation, SemanticModel)
-    private readonly ConcurrentDictionary<(string Uri, int Hash), (CSharpCompilation Compilation, SemanticModel Model)> cache = new();
+    // Cache: one entry per document URI, evicts previous version on text change.
+    // Validity is checked via (textLength, textHashCode) to avoid hash-only collisions.
+    private readonly ConcurrentDictionary<string, (int Length, int Hash, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompilationService"/> class.
@@ -35,26 +36,37 @@ public sealed class CompilationService
     }
 
     /// <summary>
-    /// Gets or creates a Roslyn compilation and semantic model for the given document.
+    /// Gets or creates a Roslyn compilation and semantic model for the given syntax tree.
     /// Returns a cached result when the document text has not changed.
+    /// Callers must pass the same <paramref name="syntaxTree"/> they use for syntax node lookups
+    /// so that the returned <see cref="SemanticModel"/> is compatible with those nodes.
     /// </summary>
     /// <param name="documentUri">The URI of the document being compiled.</param>
-    /// <param name="sourceText">The full source text of the document.</param>
+    /// <param name="syntaxTree">The caller's parsed syntax tree. The returned semantic model is for this tree.</param>
     /// <param name="filePath">Optional file path used to resolve NuGet project references.</param>
     public (CSharpCompilation Compilation, SemanticModel Model) GetCompilation(
         Uri documentUri,
-        string sourceText,
+        SyntaxTree syntaxTree,
         string? filePath = null)
     {
         string uriKey = documentUri.ToString();
+        string sourceText = syntaxTree.ToString();
+        int textLength = sourceText.Length;
         int textHash = sourceText.GetHashCode(StringComparison.Ordinal);
 
-        if (this.cache.TryGetValue((uriKey, textHash), out var cached))
+        if (this.cache.TryGetValue(uriKey, out var cached) &&
+            cached.Length == textLength &&
+            cached.Hash == textHash)
         {
-            return cached;
+            // The cached compilation used a tree with identical text.
+            // Replace the tree in the compilation so the returned SemanticModel
+            // belongs to the caller's SyntaxTree instance.
+            CSharpCompilation replaced = cached.Compilation.ReplaceSyntaxTree(
+                cached.Compilation.SyntaxTrees.First(),
+                syntaxTree);
+            SemanticModel model = replaced.GetSemanticModel(syntaxTree);
+            return (replaced, model);
         }
-
-        SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceText);
 
         var references = new List<MetadataReference>();
         var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -69,15 +81,15 @@ public sealed class CompilationService
 
         var compilation = CSharpCompilation.Create(
             "LspAnalysis",
-            [tree],
+            [syntaxTree],
             references);
 
-        SemanticModel model = compilation.GetSemanticModel(tree);
+        SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
-        var result = (compilation, model);
-        this.cache[(uriKey, textHash)] = result;
+        // Store with the current tree; replaces any prior entry for this URI.
+        this.cache[uriKey] = (textLength, textHash, compilation, semanticModel);
 
-        return result;
+        return (compilation, semanticModel);
     }
 
     /// <summary>

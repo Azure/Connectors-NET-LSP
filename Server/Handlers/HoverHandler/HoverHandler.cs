@@ -528,7 +528,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
             (CSharpCompilation compilation, SemanticModel semanticModel) = this.compilationService
                 .GetCompilation(
                     documentUri.ToUri(),
-                    documentText,
+                    tree,
                     documentFilePath);
 
             // Check for compilation errors
