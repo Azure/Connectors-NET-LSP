@@ -256,7 +256,9 @@ internal class TextDocumentSyncHandler(ILanguageServerFacade router, BufferManag
         }
 
         // Create minimal compilation
-        string? filePath = documentUri.Scheme == "file" ? documentUri.LocalPath : null;
+        string? filePath = string.Equals(documentUri.Scheme, "file", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetFullPath(documentUri.LocalPath)
+            : null;
         (_, SemanticModel semantic) = this.compilationService
             .GetCompilation(
                 documentUri,
