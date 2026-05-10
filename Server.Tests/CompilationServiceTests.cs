@@ -13,7 +13,7 @@ namespace SdkLspServer.Tests;
 public class CompilationServiceTests
 {
     [TestMethod]
-    public void GetCompilation_SameTree_ReturnsCachedReferences()
+    public void GetCompilation_SameTree_ReturnsCachedCompilation()
     {
         // Arrange
         var service = new CompilationService(sdkIndex: null);
@@ -24,10 +24,9 @@ public class CompilationServiceTests
         (CSharpCompilation first, SemanticModel firstModel) = service.GetCompilation(uri, tree);
         (CSharpCompilation second, SemanticModel secondModel) = service.GetCompilation(uri, tree);
 
-        // Assert — same references reused (compilation is replaced with caller's tree each time)
-        Assert.IsTrue(
-            first.References.SequenceEqual(second.References),
-            "Expected cached references to be reused for identical source text.");
+        // Assert — same instance returned via ReferenceEquals fast-path
+        Assert.AreSame(first, second, "Expected cached compilation instance to be returned for same SyntaxTree.");
+        Assert.AreSame(firstModel, secondModel, "Expected cached semantic model instance to be returned for same SyntaxTree.");
     }
 
     [TestMethod]

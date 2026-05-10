@@ -19,13 +19,14 @@ namespace SdkLspServer.Services;
 public sealed class CompilationService
 {
     private static readonly ConcurrentDictionary<string, List<string>> NuGetReferenceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string?> ProjectDirectoryCache = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly SdkIndex? sdkIndex;
 
     // Cache: one entry per document URI, evicts previous version on text change.
-    // Validity is checked via (textLength, textHashCode, projectDirectory) to avoid hash-only collisions
+    // Validity is checked via (textLength, contentChecksum, projectDirectory) to avoid hash-only collisions
     // and ensure NuGet references match.
-    private readonly ConcurrentDictionary<string, (int Length, int Hash, string? ProjectDirectory, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
+    private readonly ConcurrentDictionary<string, (int Length, string Checksum, string? ProjectDirectory, CSharpCompilation Compilation, SemanticModel Model)> cache = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CompilationService"/> class.
@@ -53,12 +54,14 @@ public sealed class CompilationService
         string uriKey = documentUri.ToString();
         Microsoft.CodeAnalysis.Text.SourceText sourceText = syntaxTree.GetText();
         int textLength = sourceText.Length;
-        int textHash = sourceText.ToString().GetHashCode(StringComparison.Ordinal);
-        string? projectDirectory = !string.IsNullOrEmpty(filePath) ? FindProjectDirectory(filePath) : null;
+        string checksum = Convert.ToHexString(sourceText.GetChecksum().AsSpan());
+        string? projectDirectory = !string.IsNullOrEmpty(filePath)
+            ? ProjectDirectoryCache.GetOrAdd(filePath, FindProjectDirectory)
+            : null;
 
         if (this.cache.TryGetValue(uriKey, out var cached) &&
             cached.Length == textLength &&
-            cached.Hash == textHash &&
+            string.Equals(cached.Checksum, checksum, StringComparison.Ordinal) &&
             string.Equals(cached.ProjectDirectory, projectDirectory, StringComparison.OrdinalIgnoreCase))
         {
             // Fast path: if the caller passed the exact same SyntaxTree instance,
@@ -97,7 +100,7 @@ public sealed class CompilationService
         SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree);
 
         // Store with the current tree; replaces any prior entry for this URI.
-        this.cache[uriKey] = (textLength, textHash, projectDirectory, compilation, semanticModel);
+        this.cache[uriKey] = (textLength, checksum, projectDirectory, compilation, semanticModel);
 
         return (compilation, semanticModel);
     }
