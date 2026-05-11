@@ -155,43 +155,54 @@ async function startLanguageServer(
             if (action === "Restore" && restoreCheck.projectDir && restoreCheck.projectPath) {
                 const projectDir = restoreCheck.projectDir;
                 const projectFile = restoreCheck.projectPath;
-                // Use ProcessExecution to avoid shell interpretation of the project path
-                const restoreTask = new vscode.Task(
-                    { type: "shell" },
-                    vscode.TaskScope.Workspace,
-                    "dotnet restore",
-                    "Connector SDK",
-                    new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
-                );
-                restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
-                const execution = await vscode.tasks.executeTask(restoreTask);
-                // Wait for the task to complete, then check if assets were produced
-                const listener = vscode.tasks.onDidEndTaskProcess((e) => {
-                    if (e.execution === execution) {
-                        listener.dispose();
-                        const idx = fileWatcherDisposables.indexOf(listener);
-                        if (idx !== -1) {
-                            fileWatcherDisposables.splice(idx, 1);
-                        }
-                        (async () => {
-                            try {
-                                const assetsPath = path.join(projectDir, "obj", "project.assets.json");
-                                if (await fileExists(assetsPath)) {
-                                    await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
-                                } else {
-                                    restorePromptShown = false;
-                                    vscode.window.showWarningMessage(
-                                        "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
-                                    );
-                                }
-                            } catch (err) {
-                                const message = err instanceof Error ? err.message : String(err);
-                                outputChannel.appendLine(`[RestoreCheck] Post-restore error: ${message}`);
+                try {
+                    // Use ProcessExecution to avoid shell interpretation of the project path
+                    const restoreTask = new vscode.Task(
+                        { type: "shell" },
+                        vscode.TaskScope.Workspace,
+                        "dotnet restore",
+                        "Connector SDK",
+                        new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
+                    );
+                    restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
+                    const execution = await vscode.tasks.executeTask(restoreTask);
+                    // Wait for the task to complete, then check if assets were produced
+                    const listener = vscode.tasks.onDidEndTaskProcess((e) => {
+                        if (e.execution === execution) {
+                            listener.dispose();
+                            const idx = fileWatcherDisposables.indexOf(listener);
+                            if (idx !== -1) {
+                                fileWatcherDisposables.splice(idx, 1);
                             }
-                        })();
-                    }
-                });
-                fileWatcherDisposables.push(listener);
+                            (async () => {
+                                try {
+                                    const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+                                    if (await fileExists(assetsPath)) {
+                                        await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                                    } else {
+                                        restorePromptShown = false;
+                                        vscode.window.showWarningMessage(
+                                            "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
+                                        );
+                                    }
+                                } catch (err) {
+                                    const message = err instanceof Error ? err.message : String(err);
+                                    outputChannel.appendLine(`[RestoreCheck] Post-restore error: ${message}`);
+                                }
+                            })();
+                        }
+                    });
+                    fileWatcherDisposables.push(listener);
+                } catch (err) {
+                    restorePromptShown = false;
+                    const message = err instanceof Error ? err.message : String(err);
+                    outputChannel.appendLine(`[RestoreCheck] Failed to execute restore task: ${message}`);
+                    vscode.window.showWarningMessage(
+                        "Connector SDK: Failed to run dotnet restore. Check the output channel for details."
+                    );
+                }
+                // Return early — don't start the server without SDK; the task completion handler will restart it
+                return undefined;
             }
         }
     }
@@ -391,6 +402,7 @@ async function resolveSdkPath(
 
 const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
 const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
+const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerCase() + "/");
 
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
@@ -503,7 +515,7 @@ async function findSdkFromProjectAssets(
                 // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
                 const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) => {
                     const keyLower = key.toLowerCase();
-                    return SDK_PACKAGE_NAMES.some((name) => keyLower.startsWith(name.toLowerCase() + "/"));
+                    return SDK_PACKAGE_PREFIXES_LOWER.some((prefix) => keyLower.startsWith(prefix));
                 });
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
