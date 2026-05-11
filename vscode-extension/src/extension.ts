@@ -349,6 +349,10 @@ async function resolveSdkPath(
 
 const SDK_PACKAGE_NAMES = ["Microsoft.Azure.Connectors.Sdk", "Azure.Connectors.Sdk"];
 
+function escapeRegExp(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Checks whether any .csproj in the workspace references the Connector SDK.
  * Only reads .csproj XML content (small files) — does not parse project.assets.json.
@@ -361,15 +365,19 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
 
     const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
     const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern);
+    // Match <PackageReference Include="..." /> or Update="..." attributes (case-insensitive)
+    const packageRefPattern = new RegExp(
+        `<PackageReference\\s+[^>]*(?:Include|Update)\\s*=\\s*"(${SDK_PACKAGE_NAMES.map(escapeRegExp).join("|")})"`,
+        "i"
+    );
     for (const uri of csprojFiles) {
         try {
             const rawBytes = await vscode.workspace.fs.readFile(uri);
             const content = new TextDecoder("utf-8").decode(rawBytes);
-            for (const pkgName of SDK_PACKAGE_NAMES) {
-                if (content.includes(pkgName)) {
-                    outputChannel.appendLine(`SDK reference found in ${uri.fsPath} (${pkgName})`);
-                    return true;
-                }
+            const match = content.match(packageRefPattern);
+            if (match) {
+                outputChannel.appendLine(`SDK reference found in ${uri.fsPath} (${match[1]})`);
+                return true;
             }
         } catch (err) {
             outputChannel.appendLine(
