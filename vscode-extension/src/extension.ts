@@ -152,12 +152,14 @@ async function startLanguageServer(
                 "Connector SDK IntelliSense requires package restore. Run `dotnet restore`?",
                 "Restore"
             );
-            if (action === "Restore" && restoreCheck.projectDir) {
+            if (action === "Restore" && restoreCheck.projectDir && restoreCheck.projectPath) {
                 const projectDir = restoreCheck.projectDir;
+                const projectFile = restoreCheck.projectPath;
                 const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: projectDir });
                 terminal.show();
-                terminal.sendText("dotnet restore");
-                // One-shot listener: dispose after handling the matching terminal close
+                terminal.sendText(`dotnet restore "${projectFile}"`);
+                // One-shot listener: dispose after handling the matching terminal close.
+                // Also added to fileWatcherDisposables for cleanup on deactivation/restart.
                 const listener = vscode.window.onDidCloseTerminal(async (closedTerminal) => {
                     if (closedTerminal === terminal) {
                         listener.dispose();
@@ -172,6 +174,7 @@ async function startLanguageServer(
                         }
                     }
                 });
+                fileWatcherDisposables.push(listener);
             }
         }
     }
@@ -374,10 +377,10 @@ const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
 
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
-): Promise<{ needsRestore: boolean; projectDir: string | undefined }> {
+): Promise<{ needsRestore: boolean; projectDir: string | undefined; projectPath: string | undefined }> {
     const csprojUris = await vscode.workspace.findFiles("**/*.csproj", "{**/node_modules/**,**/bin/**,**/obj/**}", 50);
     if (csprojUris.length === 0) {
-        return { needsRestore: false, projectDir: undefined };
+        return { needsRestore: false, projectDir: undefined, projectPath: undefined };
     }
 
     for (const uri of csprojUris) {
@@ -403,14 +406,14 @@ async function checkForMissingRestore(
                 outputChannel.appendLine(
                     `[RestoreCheck] ${path.basename(uri.fsPath)} references Connector SDK but obj/project.assets.json is missing`
                 );
-                return { needsRestore: true, projectDir };
+                return { needsRestore: true, projectDir, projectPath: uri.fsPath };
             }
         } catch {
             // Skip unreadable csproj files
         }
     }
 
-    return { needsRestore: false, projectDir: undefined };
+    return { needsRestore: false, projectDir: undefined, projectPath: undefined };
 }
 
 async function findSdkFromProjectAssets(
