@@ -415,7 +415,20 @@ async function checkForMissingRestore(
         return { needsRestore: false, projectDir: undefined, projectPath: undefined };
     }
 
-    for (const uri of csprojUris) {
+    // Only consider projects within 3 directory levels of a workspace folder root,
+    // matching the depth that findSdkFromProjectAssets uses for SDK discovery.
+    const maxDepth = 3;
+    const eligibleUris = csprojUris.filter((uri) => {
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!folder) {
+            return false;
+        }
+        const rel = path.relative(folder.uri.fsPath, path.dirname(uri.fsPath));
+        const depth = rel ? rel.split(path.sep).length : 0;
+        return depth <= maxDepth;
+    });
+
+    for (const uri of eligibleUris) {
         try {
             const content = await fs.promises.readFile(uri.fsPath, "utf-8");
             const referencesSdk = SDK_PACKAGE_REF_PATTERNS.some((pattern) => pattern.test(content));
