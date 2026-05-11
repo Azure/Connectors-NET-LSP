@@ -83,20 +83,18 @@ public class OperationNameFilteringTests
             textResult,
             "Text-based fallback should read ConnectorName from sibling argument");
 
-        // AST path: verify Roslyn's error recovery also produces a parsable attribute
+        // AST path: Roslyn error recovery parses the incomplete attribute successfully
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         AttributeSyntax? attribute = root.DescendantNodes().OfType<AttributeSyntax>()
             .FirstOrDefault(attributeNode => attributeNode.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
-        if (attribute != null)
-        {
-            string? astResult = CompletionHandler.ReadSiblingAttributeParameterValue(attribute, "ConnectorName");
-            Assert.AreEqual(
-                "Office365",
-                astResult,
-                "AST path should also read ConnectorName from the parsed attribute");
-        }
+        Assert.IsNotNull(attribute, "Roslyn should parse the incomplete attribute via error recovery");
+        string? astResult = CompletionHandler.ReadSiblingAttributeParameterValue(attribute, "ConnectorName");
+        Assert.AreEqual(
+            "Office365",
+            astResult,
+            "AST path should also read ConnectorName from the parsed attribute");
     }
 
     /// <summary>
