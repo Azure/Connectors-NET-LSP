@@ -99,7 +99,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const config = vscode.workspace.getConfiguration("connectorSdk");
     const explicitServerPath = config.get<string>("lspServerPath");
     if (!explicitServerPath && !(await workspaceReferencesSdk(outputChannel))) {
-        outputChannel.appendLine("No project references the Connector SDK — extension inactive");
+        outputChannel.appendLine(
+            "No project references the Connector SDK — extension inactive. " +
+            "After adding the SDK, run 'Connector SDK: Restart Language Server' or reload the window."
+        );
         return;
     }
 
@@ -347,7 +350,7 @@ async function resolveSdkPath(
     return undefined;
 }
 
-const SDK_PACKAGE_NAMES = ["Microsoft.Azure.Connectors.Sdk", "Azure.Connectors.Sdk"];
+const SDK_PACKAGE_NAMES = ["Microsoft.Azure.Connectors.Sdk", "Azure.Connectors.Sdk"] as const;
 
 function escapeRegExp(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -364,7 +367,7 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
     }
 
     const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
-    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern);
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, 50);
     // Match <PackageReference Include="..." /> or Update="..." attributes (case-insensitive)
     const packageRefPattern = new RegExp(
         `<PackageReference\\s+[^>]*(?:Include|Update)\\s*=\\s*"(${SDK_PACKAGE_NAMES.map(escapeRegExp).join("|")})"`,
