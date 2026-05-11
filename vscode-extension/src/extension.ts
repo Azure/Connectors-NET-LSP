@@ -368,8 +368,8 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
 
     const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
     const maxCsprojFiles = 50;
-    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, maxCsprojFiles);
-    if (csprojFiles.length >= maxCsprojFiles) {
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, maxCsprojFiles + 1);
+    if (csprojFiles.length > maxCsprojFiles) {
         outputChannel.appendLine(
             `Found ${csprojFiles.length}+ .csproj files (cap reached) — assuming SDK may be present`
         );
