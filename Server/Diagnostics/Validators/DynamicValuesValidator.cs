@@ -93,7 +93,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
 
         // Memoize cached value lookups per (connector, operation) to avoid
         // redundant connection resolution and cache hits on each invocation.
-        var cachedValuesLookup = new Dictionary<string, List<DynamicValueItem>?>(StringComparer.Ordinal);
+        var cachedValuesLookup = new Dictionary<(string Connector, string Operation), List<DynamicValueItem>?>();
 
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
@@ -113,7 +113,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         SourceText sourceText,
-        Dictionary<string, List<DynamicValueItem>?> cachedValuesLookup,
+        Dictionary<(string Connector, string Operation), List<DynamicValueItem>?> cachedValuesLookup,
         List<LspDiagnostic> diagnostics)
     {
         SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation);
@@ -137,10 +137,11 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         }
 
         // When the symbol comes from source (same compilation), the assembly name
-        // is the synthetic "LspAnalysis" compilation. Only filter on assembly when
+        // matches the compilation's own assembly. Only filter on assembly when
         // the symbol is from a metadata reference (i.e., a real SDK DLL).
+        string? compilationAssembly = semanticModel.Compilation.AssemblyName;
         if (containingAssembly is not null &&
-            !string.Equals(containingAssembly, "LspAnalysis", StringComparison.Ordinal) &&
+            !string.Equals(containingAssembly, compilationAssembly, StringComparison.Ordinal) &&
             !containingAssembly.StartsWith("Azure.Connectors.Sdk", StringComparison.Ordinal))
         {
             return;
@@ -186,7 +187,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
             // CSDK300: String literal does not match any cached dynamic value.
             // Only emit when we have cached values to check against.
             string literalValue = literal.Token.ValueText;
-            string cacheKey = $"{connectorName}:{operationId}";
+            var cacheKey = (connectorName, operationId);
             if (!cachedValuesLookup.TryGetValue(cacheKey, out List<DynamicValueItem>? cachedValues))
             {
                 cachedValues = this.TryGetCachedValues(connectorName, operationId);
