@@ -125,10 +125,23 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
             return;
         }
 
-        // Only inspect methods on types from the Connectors SDK namespace.
+        // Only inspect methods on types from the Connectors SDK.
+        // Check both namespace and assembly name to avoid false positives from
+        // user-defined types under the Azure.Connectors.Sdk namespace.
         string? containingNamespace = methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString();
+        string? containingAssembly = methodSymbol.ContainingAssembly?.Name;
         if (containingNamespace is null ||
             !containingNamespace.StartsWith("Azure.Connectors.Sdk", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // When the symbol comes from source (same compilation), the assembly name
+        // is the synthetic "LspAnalysis" compilation. Only filter on assembly when
+        // the symbol is from a metadata reference (i.e., a real SDK DLL).
+        if (containingAssembly is not null &&
+            !string.Equals(containingAssembly, "LspAnalysis", StringComparison.Ordinal) &&
+            !containingAssembly.StartsWith("Azure.Connectors.Sdk", StringComparison.Ordinal))
         {
             return;
         }
@@ -136,6 +149,12 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         // Infer the connector name from the containing type (e.g., SharePointOnlineClient → sharepointonline).
         string? connectorName = DynamicValuesHelper.InferConnectorFromContainingType(
             methodSymbol.ContainingType?.Name);
+
+        // Short-circuit when connector inference fails — cache lookup requires a connector name.
+        if (string.IsNullOrEmpty(connectorName))
+        {
+            return;
+        }
 
         SeparatedSyntaxList<ArgumentSyntax> arguments = invocation.ArgumentList.Arguments;
 

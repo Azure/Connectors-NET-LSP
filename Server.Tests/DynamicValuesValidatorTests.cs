@@ -343,6 +343,45 @@ public class DynamicValuesValidatorTests
         Assert.IsNull(result, message: "Should not emit CSDK300 when the literal matches a cached Description.");
     }
 
+    [TestMethod]
+    public async Task ValidateAsync_NamedArgument_InvalidValue_EmitsCSdk300Async()
+    {
+        // Arrange — named argument with invalid value
+        var sdkIndex = DynamicValuesValidatorTests.CreateMockSdkIndex();
+        var validator = DynamicValuesValidatorTests.CreateValidatorWithCache(
+            sdkIndex,
+            connector: "sharepointonline",
+            operation: "GetDataSets",
+            connectionName: "sp-conn",
+            cachedValues: [new DynamicValueItem("\"https://contoso.sharepoint.com\"", "Contoso")]);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = DynamicValuesValidatorTests.SdkPreamble + """
+
+            namespace TestApp
+            {
+                class MyFunctions
+                {
+                    private Azure.Connectors.Sdk.SharePointOnline.SharePointOnlineClient client;
+                    async Task Run()
+                    {
+                        await client.GetAllTablesAsync(siteAddress: "foobar");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
+        Assert.IsNotNull(result, message: "Expected CSDK300 for named argument with invalid value.");
+        Assert.IsTrue(result.Message.Contains("foobar", StringComparison.Ordinal));
+    }
+
     // ---------------------------------------------------------------
     // Edge cases
     // ---------------------------------------------------------------
