@@ -174,14 +174,19 @@ async function startLanguageServer(
                             fileWatcherDisposables.splice(idx, 1);
                         }
                         (async () => {
-                            const assetsPath = path.join(projectDir, "obj", "project.assets.json");
-                            if (await fileExists(assetsPath)) {
-                                await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
-                            } else {
-                                restorePromptShown = false;
-                                vscode.window.showWarningMessage(
-                                    "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
-                                );
+                            try {
+                                const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+                                if (await fileExists(assetsPath)) {
+                                    await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                                } else {
+                                    restorePromptShown = false;
+                                    vscode.window.showWarningMessage(
+                                        "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
+                                    );
+                                }
+                            } catch (err) {
+                                const message = err instanceof Error ? err.message : String(err);
+                                outputChannel.appendLine(`[RestoreCheck] Post-restore error: ${message}`);
                             }
                         })();
                     }
@@ -398,9 +403,10 @@ async function checkForMissingRestore(
     for (const uri of csprojUris) {
         try {
             const content = await fs.promises.readFile(uri.fsPath, "utf-8");
-            const referencesSdk = SDK_PACKAGE_NAMES.some((name) =>
-                new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${name}["']`, "i").test(content)
-            );
+            const referencesSdk = SDK_PACKAGE_NAMES.some((name) => {
+                const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                return new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${escaped}["']`, "i").test(content);
+            });
             if (!referencesSdk) {
                 continue;
             }
@@ -413,7 +419,14 @@ async function checkForMissingRestore(
             if (!hasCustomIntermediatePath) {
                 const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
                 let searchDir: string | undefined = path.dirname(uri.fsPath);
-                while (searchDir && (!workspaceRoot || searchDir.startsWith(workspaceRoot))) {
+                const isWithinWorkspace = (dir: string): boolean => {
+                    if (!workspaceRoot) {
+                        return true;
+                    }
+                    const rel = path.relative(workspaceRoot, dir);
+                    return !rel.startsWith("..") && !path.isAbsolute(rel);
+                };
+                while (searchDir && isWithinWorkspace(searchDir)) {
                     for (const buildFile of ["Directory.Build.props", "Directory.Build.targets"]) {
                         const buildFilePath = path.join(searchDir, buildFile);
                         if (await fileExists(buildFilePath)) {
