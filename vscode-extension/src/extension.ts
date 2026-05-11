@@ -13,6 +13,7 @@ let client: LanguageClient | undefined;
 let fileWatcherDisposables: vscode.Disposable[] = [];
 let traceOutputChannel: vscode.OutputChannel | undefined;
 let tokenRefreshTimer: NodeJS.Timeout | undefined;
+let restorePromptShown = false;
 
 async function fileExists(filePath: string): Promise<boolean> {
     try {
@@ -142,6 +143,26 @@ async function startLanguageServer(
         } else {
             args.push("--sdk", sdkResult.paths[0]);
             outputChannel.appendLine(`SDK .nupkg: ${sdkResult.paths[0]} (source: ${sdkResult.source})`);
+        }
+    } else if (!restorePromptShown && !config.get<string>("sdkPath")) {
+        const restoreCheck = await checkForMissingRestore(outputChannel);
+        if (restoreCheck.needsRestore) {
+            restorePromptShown = true;
+            const action = await vscode.window.showInformationMessage(
+                "Connector SDK IntelliSense requires package restore. Run `dotnet restore`?",
+                "Restore"
+            );
+            if (action === "Restore" && restoreCheck.projectDir) {
+                const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: restoreCheck.projectDir });
+                terminal.show();
+                terminal.sendText("dotnet restore");
+                // Give the user time to see the restore output, then restart the server
+                vscode.window.onDidCloseTerminal(async (closedTerminal) => {
+                    if (closedTerminal === terminal) {
+                        await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                    }
+                });
+            }
         }
     }
 
@@ -339,6 +360,86 @@ async function resolveSdkPath(
 }
 
 const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
+const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
+
+async function checkForMissingRestore(
+    outputChannel: vscode.OutputChannel
+): Promise<{ needsRestore: boolean; projectDir: string | undefined }> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return { needsRestore: false, projectDir: undefined };
+    }
+
+    for (const folder of workspaceFolders) {
+        const result = await scanForUnrestoredSdkProject(folder.uri.fsPath, outputChannel, 3);
+        if (result) {
+            return { needsRestore: true, projectDir: result };
+        }
+    }
+
+    return { needsRestore: false, projectDir: undefined };
+}
+
+async function scanForUnrestoredSdkProject(
+    folderPath: string,
+    outputChannel: vscode.OutputChannel,
+    maxDepth: number
+): Promise<string | undefined> {
+    try {
+        const entries = await fs.promises.readdir(folderPath);
+        const csprojFiles = entries.filter((f) => f.toLowerCase().endsWith(".csproj"));
+
+        for (const csproj of csprojFiles) {
+            const csprojPath = path.join(folderPath, csproj);
+            try {
+                const content = await fs.promises.readFile(csprojPath, "utf-8");
+                const referencesSdk = SDK_PACKAGE_NAMES.some((name) => content.includes(name));
+                if (!referencesSdk) {
+                    continue;
+                }
+
+                const assetsPath = path.join(folderPath, "obj", "project.assets.json");
+                if (!(await fileExists(assetsPath))) {
+                    outputChannel.appendLine(
+                        `[RestoreCheck] ${csproj} references Connector SDK but obj/project.assets.json is missing`
+                    );
+                    return folderPath;
+                }
+            } catch {
+                // Skip unreadable csproj files
+            }
+        }
+
+        // Recurse into subdirectories
+        const skipDirs = new Set(["node_modules", ".git", "bin", "obj", ".vs", ".vscode", "TestResults"]);
+        if (maxDepth > 0) {
+            for (const entry of entries) {
+                if (skipDirs.has(entry)) {
+                    continue;
+                }
+
+                const subDir = path.join(folderPath, entry);
+                try {
+                    const subStat = await fs.promises.stat(subDir);
+                    if (!subStat.isDirectory()) {
+                        continue;
+                    }
+
+                    const result = await scanForUnrestoredSdkProject(subDir, outputChannel, maxDepth - 1);
+                    if (result) {
+                        return result;
+                    }
+                } catch {
+                    continue;
+                }
+            }
+        }
+    } catch {
+        // Folder not readable
+    }
+
+    return undefined;
+}
 
 async function findSdkFromProjectAssets(
     folderPath: string,
