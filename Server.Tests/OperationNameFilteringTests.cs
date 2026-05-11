@@ -43,9 +43,9 @@ public class OperationNameFilteringTests
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
 
-        // Find the OperationName attribute argument
+        // Find the ConnectorTriggerMetadata attribute node
         AttributeSyntax attribute = root.DescendantNodes().OfType<AttributeSyntax>()
-            .First(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
+            .First(attributeNode => attributeNode.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
         string? connectorName = CompletionHandler.ReadSiblingAttributeParameterValue(attribute, "ConnectorName");
 
@@ -87,7 +87,7 @@ public class OperationNameFilteringTests
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
         AttributeSyntax? attribute = root.DescendantNodes().OfType<AttributeSyntax>()
-            .FirstOrDefault(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
+            .FirstOrDefault(attributeNode => attributeNode.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
         if (attribute != null)
         {
