@@ -94,6 +94,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })
     );
 
+    // Early exit: skip LSP server if no project references the SDK,
+    // unless the developer has explicitly configured an LSP server path.
+    const config = vscode.workspace.getConfiguration("connectorSdk");
+    const explicitServerPath = config.get<string>("lspServerPath");
+    if (!explicitServerPath && !(await workspaceReferencesSdk(outputChannel))) {
+        outputChannel.appendLine("No project references Azure.Connectors.Sdk — extension inactive");
+        return;
+    }
+
     client = await startLanguageServer(context, outputChannel);
 }
 
@@ -338,7 +347,35 @@ async function resolveSdkPath(
     return undefined;
 }
 
-const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
+const SDK_PACKAGE_NAMES = ["Microsoft.Azure.Connectors.Sdk", "Azure.Connectors.Sdk"];
+
+/**
+ * Checks whether any .csproj in the workspace references the Connector SDK.
+ * Only reads .csproj XML content (small files) — does not parse project.assets.json.
+ */
+async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Promise<boolean> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return false;
+    }
+
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", "**/node_modules/**");
+    for (const uri of csprojFiles) {
+        try {
+            const content = await fs.promises.readFile(uri.fsPath, "utf-8");
+            for (const pkgName of SDK_PACKAGE_NAMES) {
+                if (content.includes(pkgName)) {
+                    outputChannel.appendLine(`SDK reference found in ${uri.fsPath} (${pkgName})`);
+                    return true;
+                }
+            }
+        } catch {
+            // File unreadable — skip
+        }
+    }
+
+    return false;
+}
 
 async function findSdkFromProjectAssets(
     folderPath: string,
@@ -367,9 +404,8 @@ async function findSdkFromProjectAssets(
                 };
 
                 // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
-                const sdkPackagePrefix = (SDK_PACKAGE_NAME + "/").toLowerCase();
                 const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
-                    key.toLowerCase().startsWith(sdkPackagePrefix)
+                    SDK_PACKAGE_NAMES.some((name) => key.toLowerCase().startsWith((name + "/").toLowerCase()))
                 );
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
