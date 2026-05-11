@@ -165,10 +165,9 @@ async function startLanguageServer(
                         new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
                     );
                     restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
-                    const execution = await vscode.tasks.executeTask(restoreTask);
-                    // Wait for the task to complete, then check if assets were produced
+                    // Register the listener BEFORE executing the task so we don't miss near-instant completions
                     const listener = vscode.tasks.onDidEndTaskProcess((e) => {
-                        if (e.execution === execution) {
+                        if (e.execution.task === restoreTask) {
                             listener.dispose();
                             const idx = fileWatcherDisposables.indexOf(listener);
                             if (idx !== -1) {
@@ -193,6 +192,7 @@ async function startLanguageServer(
                         }
                     });
                     fileWatcherDisposables.push(listener);
+                    await vscode.tasks.executeTask(restoreTask);
                 } catch (err) {
                     restorePromptShown = false;
                     const message = err instanceof Error ? err.message : String(err);
