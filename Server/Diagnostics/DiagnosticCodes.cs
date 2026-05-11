@@ -91,7 +91,12 @@ internal static class DiagnosticCodes
     // CSDK300–CSDK399: DynamicValues / DynamicSchema
     // ---------------------------------------------------------------
 
-    // (reserved for future validators)
+    /// <summary>
+    /// A string literal passed to a <c>[DynamicValues]</c> parameter does not match
+    /// any of the values returned by the dynamic values API. Emitted only when the
+    /// API has been called (e.g., via hover or completion) and the result is cached.
+    /// </summary>
+    public const string DynamicValuesInvalidValue = "CSDK300";
 
     // ---------------------------------------------------------------
     // CSDK400–CSDK499: SDK usage patterns
