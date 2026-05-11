@@ -933,14 +933,14 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// Reads a sibling parameter value from an AttributeSyntax.
     /// For example, reading "ConnectorName" when the cursor is at "OperationName".
     /// </summary>
-    private static string? ReadSiblingAttributeParameterValue(AttributeSyntax attr, string parameterName)
+    internal static string? ReadSiblingAttributeParameterValue(AttributeSyntax attribute, string parameterName)
     {
-        if (attr.ArgumentList is null)
+        if (attribute.ArgumentList is null)
         {
             return null;
         }
 
-        foreach (AttributeArgumentSyntax arg in attr.ArgumentList.Arguments)
+        foreach (AttributeArgumentSyntax arg in attribute.ArgumentList.Arguments)
         {
             if (arg.NameEquals is null ||
                 !string.Equals(arg.NameEquals.Name.Identifier.Text, parameterName, StringComparison.Ordinal))
@@ -975,51 +975,81 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// Extracts a parameter value from raw text context. Handles both:
     /// - String literals: ConnectorName = "office365"
     /// - Constant references: ConnectorName = ConnectorNames.Office365.
+    /// When the context window contains multiple attributes (e.g., stacked trigger methods),
+    /// narrows the search to the last attribute to avoid reading values from the wrong one.
     /// </summary>
-    private static string? ExtractParameterValueFromText(string contextText, string parameterName)
+    internal static string? ExtractParameterValueFromText(string contextText, string parameterName)
     {
+        // Narrow to the last attribute in the context so we don't match
+        // parameters from an earlier [ConnectorTriggerMetadata] that the
+        // backwards line scan happened to include (fixes issue #74).
+        // Use startIndex instead of Substring to avoid allocating a new string.
+        int searchStart = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
+        if (searchStart < 0)
+        {
+            searchStart = 0;
+        }
+
         // Find "ParameterName = " or "ParameterName ="
-        int paramIndex = contextText.IndexOf(parameterName, StringComparison.Ordinal);
+        int paramIndex = contextText.IndexOf(parameterName, searchStart, StringComparison.Ordinal);
         if (paramIndex < 0)
         {
             return null;
         }
 
-        string afterParam = contextText.Substring(paramIndex + parameterName.Length).TrimStart();
-        if (!afterParam.StartsWith("=", StringComparison.Ordinal))
+        // Advance past the parameter name and skip whitespace
+        int cursor = paramIndex + parameterName.Length;
+        while (cursor < contextText.Length && char.IsWhiteSpace(contextText[cursor]))
+        {
+            cursor++;
+        }
+
+        if (cursor >= contextText.Length || contextText[cursor] != '=')
         {
             return null;
         }
 
-        afterParam = afterParam.Substring(1).TrimStart();
+        // Advance past '=' and skip whitespace
+        cursor++;
+        while (cursor < contextText.Length && char.IsWhiteSpace(contextText[cursor]))
+        {
+            cursor++;
+        }
+
+        if (cursor >= contextText.Length)
+        {
+            return null;
+        }
 
         // String literal: "value"
-        if (afterParam.StartsWith("\"", StringComparison.Ordinal))
+        if (contextText[cursor] == '"')
         {
-            int endQuote = afterParam.IndexOf('"', 1);
-            if (endQuote > 1)
+            int endQuote = contextText.IndexOf('"', cursor + 1);
+            if (endQuote > cursor + 1)
             {
-                return afterParam.Substring(1, endQuote - 1);
+                return contextText.Substring(cursor + 1, endQuote - cursor - 1);
             }
+
+            // Unterminated string literal — don't fall through to constant reference
+            // parsing, which could misinterpret a dot from a later parameter value.
+            return null;
         }
 
         // Constant reference: ConnectorNames.Office365
         // Extract the member name after the dot
-        int dotIndex = afterParam.IndexOf('.');
+        int dotIndex = contextText.IndexOf('.', cursor);
         if (dotIndex >= 0)
         {
-            string afterDot = afterParam.Substring(dotIndex + 1);
-
-            // Read identifier characters
-            int end = 0;
-            while (end < afterDot.Length && (char.IsLetterOrDigit(afterDot[end]) || afterDot[end] == '_'))
+            int identifierStart = dotIndex + 1;
+            int identifierEnd = identifierStart;
+            while (identifierEnd < contextText.Length && (char.IsLetterOrDigit(contextText[identifierEnd]) || contextText[identifierEnd] == '_'))
             {
-                end++;
+                identifierEnd++;
             }
 
-            if (end > 0)
+            if (identifierEnd > identifierStart)
             {
-                return afterDot.Substring(0, end);
+                return contextText.Substring(identifierStart, identifierEnd - identifierStart);
             }
         }
 

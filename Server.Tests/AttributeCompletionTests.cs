@@ -2,6 +2,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
+using SdkLspServer.Handlers.CompletionHandler;
+
 namespace Server.Tests;
 
 /// <summary>
@@ -191,7 +193,7 @@ public class AttributeCompletionTests
     {
         string context = "[ConnectorTriggerMetadata(ConnectorName = \"office365\", OperationName = \"";
 
-        string? result = ExtractParameterValueFromText(context, "ConnectorName");
+        string? result = CompletionHandler.ExtractParameterValueFromText(context, "ConnectorName");
 
         Assert.AreEqual("office365", result);
     }
@@ -205,7 +207,7 @@ public class AttributeCompletionTests
     {
         string context = "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = \"";
 
-        string? result = ExtractParameterValueFromText(context, "ConnectorName");
+        string? result = CompletionHandler.ExtractParameterValueFromText(context, "ConnectorName");
 
         Assert.AreEqual("Office365", result);
     }
@@ -218,7 +220,7 @@ public class AttributeCompletionTests
     {
         string context = "[ConnectorTriggerMetadata(ConnectorName = \"office365\"";
 
-        string? result = ExtractParameterValueFromText(context, "OperationName");
+        string? result = CompletionHandler.ExtractParameterValueFromText(context, "OperationName");
 
         Assert.IsNull(result);
     }
@@ -395,50 +397,6 @@ public class AttributeCompletionTests
         paramName = beforeEquals.Substring(nameStart).Trim();
 
         return paramName.Length > 0 && char.IsUpper(paramName[0]);
-    }
-
-    private static string? ExtractParameterValueFromText(string contextText, string parameterName)
-    {
-        int paramIndex = contextText.IndexOf(parameterName, StringComparison.Ordinal);
-        if (paramIndex < 0)
-        {
-            return null;
-        }
-
-        string afterParam = contextText.Substring(paramIndex + parameterName.Length).TrimStart();
-        if (!afterParam.StartsWith("=", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        afterParam = afterParam.Substring(1).TrimStart();
-
-        if (afterParam.StartsWith("\"", StringComparison.Ordinal))
-        {
-            int endQuote = afterParam.IndexOf('"', 1);
-            if (endQuote > 1)
-            {
-                return afterParam.Substring(1, endQuote - 1);
-            }
-        }
-
-        int dotIndex = afterParam.IndexOf('.');
-        if (dotIndex >= 0)
-        {
-            string afterDot = afterParam.Substring(dotIndex + 1);
-            int end = 0;
-            while (end < afterDot.Length && (char.IsLetterOrDigit(afterDot[end]) || afterDot[end] == '_'))
-            {
-                end++;
-            }
-
-            if (end > 0)
-            {
-                return afterDot.Substring(0, end);
-            }
-        }
-
-        return null;
     }
 
     private static string? GetEnclosingMethodTriggerOperationName(CompilationUnitSyntax root, int absolutePosition)
