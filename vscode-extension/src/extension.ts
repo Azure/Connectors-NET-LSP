@@ -153,14 +153,23 @@ async function startLanguageServer(
                 "Restore"
             );
             if (action === "Restore" && restoreCheck.projectDir) {
-                const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: restoreCheck.projectDir });
+                const projectDir = restoreCheck.projectDir;
+                const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: projectDir });
                 terminal.show();
                 terminal.sendText("dotnet restore");
                 // One-shot listener: dispose after handling the matching terminal close
                 const listener = vscode.window.onDidCloseTerminal(async (closedTerminal) => {
                     if (closedTerminal === terminal) {
                         listener.dispose();
-                        await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                        const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+                        if (await fileExists(assetsPath)) {
+                            await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                        } else {
+                            restorePromptShown = false;
+                            vscode.window.showWarningMessage(
+                                "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
+                            );
+                        }
                     }
                 });
             }
@@ -366,76 +375,42 @@ const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
 ): Promise<{ needsRestore: boolean; projectDir: string | undefined }> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+    const csprojUris = await vscode.workspace.findFiles("**/*.csproj", "{**/node_modules/**,**/bin/**,**/obj/**}", 50);
+    if (csprojUris.length === 0) {
         return { needsRestore: false, projectDir: undefined };
     }
 
-    for (const folder of workspaceFolders) {
-        const result = await scanForUnrestoredSdkProject(folder.uri.fsPath, outputChannel, 3);
-        if (result) {
-            return { needsRestore: true, projectDir: result };
+    for (const uri of csprojUris) {
+        try {
+            const content = await fs.promises.readFile(uri.fsPath, "utf-8");
+            const contentLower = content.toLowerCase();
+            const referencesSdk = SDK_PACKAGE_NAMES.some((name) => contentLower.includes(name.toLowerCase()));
+            if (!referencesSdk) {
+                continue;
+            }
+
+            // Skip projects with custom intermediate output paths — we can't reliably locate their assets file
+            if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(content)) {
+                outputChannel.appendLine(
+                    `[RestoreCheck] ${path.basename(uri.fsPath)} has custom IntermediateOutputPath — skipping`
+                );
+                continue;
+            }
+
+            const projectDir = path.dirname(uri.fsPath);
+            const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+            if (!(await fileExists(assetsPath))) {
+                outputChannel.appendLine(
+                    `[RestoreCheck] ${path.basename(uri.fsPath)} references Connector SDK but obj/project.assets.json is missing`
+                );
+                return { needsRestore: true, projectDir };
+            }
+        } catch {
+            // Skip unreadable csproj files
         }
     }
 
     return { needsRestore: false, projectDir: undefined };
-}
-
-async function scanForUnrestoredSdkProject(
-    folderPath: string,
-    outputChannel: vscode.OutputChannel,
-    maxDepth: number
-): Promise<string | undefined> {
-    try {
-        const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
-        const csprojFiles = entries.filter((f) => f.isFile() && f.name.toLowerCase().endsWith(".csproj"));
-
-        for (const csprojEntry of csprojFiles) {
-            const csprojPath = path.join(folderPath, csprojEntry.name);
-            try {
-                const content = await fs.promises.readFile(csprojPath, "utf-8");
-                const contentLower = content.toLowerCase();
-                const referencesSdk = SDK_PACKAGE_NAMES.some((name) => contentLower.includes(name.toLowerCase()));
-                if (!referencesSdk) {
-                    continue;
-                }
-
-                const assetsPath = path.join(folderPath, "obj", "project.assets.json");
-                if (!(await fileExists(assetsPath))) {
-                    outputChannel.appendLine(
-                        `[RestoreCheck] ${csprojEntry.name} references Connector SDK but obj/project.assets.json is missing`
-                    );
-                    return folderPath;
-                }
-            } catch {
-                // Skip unreadable csproj files
-            }
-        }
-
-        // Recurse into subdirectories
-        const skipDirs = new Set(["node_modules", ".git", "bin", "obj", ".vs", ".vscode", "TestResults"]);
-        if (maxDepth > 0) {
-            for (const entry of entries) {
-                if (!entry.isDirectory() || skipDirs.has(entry.name)) {
-                    continue;
-                }
-
-                const subDir = path.join(folderPath, entry.name);
-                try {
-                    const result = await scanForUnrestoredSdkProject(subDir, outputChannel, maxDepth - 1);
-                    if (result) {
-                        return result;
-                    }
-                } catch {
-                    continue;
-                }
-            }
-        }
-    } catch {
-        // Folder not readable
-    }
-
-    return undefined;
 }
 
 async function findSdkFromProjectAssets(
