@@ -99,7 +99,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const config = vscode.workspace.getConfiguration("connectorSdk");
     const explicitServerPath = config.get<string>("lspServerPath");
     if (!explicitServerPath && !(await workspaceReferencesSdk(outputChannel))) {
-        outputChannel.appendLine("No project references Azure.Connectors.Sdk — extension inactive");
+        outputChannel.appendLine("No project references the Connector SDK — extension inactive");
         return;
     }
 
@@ -364,7 +364,7 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
     for (const uri of csprojFiles) {
         try {
             const rawBytes = await vscode.workspace.fs.readFile(uri);
-            const content = Buffer.from(rawBytes).toString("utf-8");
+            const content = new TextDecoder("utf-8").decode(rawBytes);
             for (const pkgName of SDK_PACKAGE_NAMES) {
                 if (content.includes(pkgName)) {
                     outputChannel.appendLine(`SDK reference found in ${uri.fsPath} (${pkgName})`);
@@ -373,9 +373,8 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
             }
         } catch (err) {
             outputChannel.appendLine(
-                `Failed to read ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)} — assuming SDK may be present`
+                `Failed to read ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)} — skipping`
             );
-            return true;
         }
     }
 
@@ -409,9 +408,11 @@ async function findSdkFromProjectAssets(
                 };
 
                 // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
-                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
-                    SDK_PACKAGE_NAMES.some((name) => key.toLowerCase().startsWith((name + "/").toLowerCase()))
-                );
+                const sdkPackagePrefixes = SDK_PACKAGE_NAMES.map((name) => (name + "/").toLowerCase());
+                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) => {
+                    const lowerKey = key.toLowerCase();
+                    return sdkPackagePrefixes.some((prefix) => lowerKey.startsWith(prefix));
+                });
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
                     continue;
