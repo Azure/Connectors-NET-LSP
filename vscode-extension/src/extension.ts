@@ -367,10 +367,17 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
     }
 
     const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
-    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, 50);
-    // Match <PackageReference Include="..." /> or Update="..." attributes (case-insensitive)
+    const maxCsprojFiles = 50;
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, maxCsprojFiles);
+    if (csprojFiles.length >= maxCsprojFiles) {
+        outputChannel.appendLine(
+            `Found ${csprojFiles.length}+ .csproj files (cap reached) — assuming SDK may be present`
+        );
+        return true;
+    }
+    // Match <PackageReference Include="..." /> or Update="..." attributes (case-insensitive, single or double quotes)
     const packageRefPattern = new RegExp(
-        `<PackageReference\\s+[^>]*(?:Include|Update)\\s*=\\s*"(${SDK_PACKAGE_NAMES.map(escapeRegExp).join("|")})"`,
+        `<PackageReference\\s+[^>]*(?:Include|Update)\\s*=\\s*["'](${SDK_PACKAGE_NAMES.map(escapeRegExp).join("|")})["']`,
         "i"
     );
     for (const uri of csprojFiles) {
