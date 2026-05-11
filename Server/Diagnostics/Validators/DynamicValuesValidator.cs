@@ -270,6 +270,9 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         }
 
         // Strip surrounding quotes if the cached value is wrapped (e.g., "\"value\"" → "value").
+        // NOTE: Dynamic values from the API are plain strings (site URLs, list names, etc.)
+        // wrapped in literal quote characters for code insertion. They do not contain C#
+        // escape sequences (\\, \\\", etc.) so simple quote stripping is sufficient.
         string normalizedCached = cachedValue.Length >= 2 &&
             cachedValue[0] == '"' &&
             cachedValue[cachedValue.Length - 1] == '"'
@@ -281,6 +284,12 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
 
     /// <summary>
     /// Checks whether a parameter has the <c>[DynamicValues]</c> attribute and extracts the operation ID.
+    /// <para>
+    /// Matches by short name (<c>DynamicValuesAttribute</c> / <c>DynamicValues</c>) rather than
+    /// fully-qualified name. This is safe because the containing method is already filtered to
+    /// <c>Azure.Connectors.Sdk.*</c> namespace + assembly, making a same-named attribute from
+    /// another namespace extremely unlikely on these parameters.
+    /// </para>
     /// </summary>
     private static (bool HasDynamicValues, string? OperationId) GetDynamicValuesAttribute(IParameterSymbol parameter)
     {
