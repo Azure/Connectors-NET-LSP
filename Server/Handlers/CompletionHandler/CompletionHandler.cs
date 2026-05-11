@@ -1029,6 +1029,10 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
             {
                 return contextText.Substring(cursor + 1, endQuote - cursor - 1);
             }
+
+            // Unterminated string literal — don't fall through to constant reference
+            // parsing, which could misinterpret a dot from a later parameter value.
+            return null;
         }
 
         // Constant reference: ConnectorNames.Office365

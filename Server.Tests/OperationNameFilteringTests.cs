@@ -180,4 +180,23 @@ public class OperationNameFilteringTests
 
         Assert.IsNull(result);
     }
+
+    /// <summary>
+    /// Verifies that an unterminated string literal does not fall through to the
+    /// constant reference parsing path, which could misinterpret a dot from a later
+    /// parameter as a ConnectorName value.
+    /// </summary>
+    [TestMethod]
+    public void ExtractConnectorName_UnterminatedStringLiteral_ReturnsNull()
+    {
+        // ConnectorName starts with a quote but is not closed — cursor is mid-edit.
+        // OperationName has a dot that should NOT be mistaken for the ConnectorName value.
+        string contextWindow = "[ConnectorTriggerMetadata(ConnectorName = \"office, OperationName = SomeOps.SomeValue";
+
+        string? connectorName = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
+
+        Assert.IsNull(
+            connectorName,
+            "Should return null for unterminated string literal, not fall through to dot parsing");
+    }
 }
