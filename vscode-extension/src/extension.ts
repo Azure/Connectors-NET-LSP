@@ -165,14 +165,12 @@ async function startLanguageServer(
                         new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
                     );
                     restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
-                    // Register the listener BEFORE executing the task so we don't miss near-instant completions
+                    // Register the listener BEFORE executing the task so we don't miss near-instant completions.
+                    // Stored in a separate variable (not fileWatcherDisposables) so a manual server restart
+                    // during restore doesn't dispose it prematurely.
                     const listener = vscode.tasks.onDidEndTaskProcess((e) => {
                         if (e.execution.task === restoreTask) {
                             listener.dispose();
-                            const idx = fileWatcherDisposables.indexOf(listener);
-                            if (idx !== -1) {
-                                fileWatcherDisposables.splice(idx, 1);
-                            }
                             (async () => {
                                 try {
                                     const assetsPath = path.join(projectDir, "obj", "project.assets.json");
@@ -191,8 +189,10 @@ async function startLanguageServer(
                             })();
                         }
                     });
-                    fileWatcherDisposables.push(listener);
+                    context.subscriptions.push(listener);
                     await vscode.tasks.executeTask(restoreTask);
+                    // Return early — don't start the server without SDK; the task completion handler will restart it
+                    return undefined;
                 } catch (err) {
                     restorePromptShown = false;
                     const message = err instanceof Error ? err.message : String(err);
@@ -200,9 +200,8 @@ async function startLanguageServer(
                     vscode.window.showWarningMessage(
                         "Connector SDK: Failed to run dotnet restore. Check the output channel for details."
                     );
+                    // Fall through to start the server without SDK
                 }
-                // Return early — don't start the server without SDK; the task completion handler will restart it
-                return undefined;
             }
         }
     }
@@ -403,6 +402,10 @@ async function resolveSdkPath(
 const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
 const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
 const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerCase() + "/");
+const SDK_PACKAGE_REF_PATTERNS = SDK_PACKAGE_NAMES.map((name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${escaped}["']`, "i");
+});
 
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
@@ -415,10 +418,7 @@ async function checkForMissingRestore(
     for (const uri of csprojUris) {
         try {
             const content = await fs.promises.readFile(uri.fsPath, "utf-8");
-            const referencesSdk = SDK_PACKAGE_NAMES.some((name) => {
-                const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                return new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${escaped}["']`, "i").test(content);
-            });
+            const referencesSdk = SDK_PACKAGE_REF_PATTERNS.some((pattern) => pattern.test(content));
             if (!referencesSdk) {
                 continue;
             }
