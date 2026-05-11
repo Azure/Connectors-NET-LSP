@@ -144,7 +144,7 @@ async function startLanguageServer(
             args.push("--sdk", sdkResult.paths[0]);
             outputChannel.appendLine(`SDK .nupkg: ${sdkResult.paths[0]} (source: ${sdkResult.source})`);
         }
-    } else if (!restorePromptShown && !config.get<string>("sdkPath")) {
+    } else if (!restorePromptShown && !config.get<string>("sdkPath") && !config.get<string>("sdkNupkgPath")) {
         const restoreCheck = await checkForMissingRestore(outputChannel);
         if (restoreCheck.needsRestore) {
             restorePromptShown = true;
@@ -155,23 +155,35 @@ async function startLanguageServer(
             if (action === "Restore" && restoreCheck.projectDir && restoreCheck.projectPath) {
                 const projectDir = restoreCheck.projectDir;
                 const projectFile = restoreCheck.projectPath;
-                const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: projectDir });
-                terminal.show();
-                terminal.sendText(`dotnet restore "${projectFile}"`);
-                // One-shot listener: dispose after handling the matching terminal close.
-                // Also added to fileWatcherDisposables for cleanup on deactivation/restart.
-                const listener = vscode.window.onDidCloseTerminal(async (closedTerminal) => {
-                    if (closedTerminal === terminal) {
+                // Use ProcessExecution to avoid shell interpretation of the project path
+                const restoreTask = new vscode.Task(
+                    { type: "shell" },
+                    vscode.TaskScope.Workspace,
+                    "dotnet restore",
+                    "Connector SDK",
+                    new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
+                );
+                restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
+                const execution = await vscode.tasks.executeTask(restoreTask);
+                // Wait for the task to complete, then check if assets were produced
+                const listener = vscode.tasks.onDidEndTaskProcess((e) => {
+                    if (e.execution === execution) {
                         listener.dispose();
-                        const assetsPath = path.join(projectDir, "obj", "project.assets.json");
-                        if (await fileExists(assetsPath)) {
-                            await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
-                        } else {
-                            restorePromptShown = false;
-                            vscode.window.showWarningMessage(
-                                "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
-                            );
+                        const idx = fileWatcherDisposables.indexOf(listener);
+                        if (idx !== -1) {
+                            fileWatcherDisposables.splice(idx, 1);
                         }
+                        (async () => {
+                            const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+                            if (await fileExists(assetsPath)) {
+                                await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                            } else {
+                                restorePromptShown = false;
+                                vscode.window.showWarningMessage(
+                                    "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
+                                );
+                            }
+                        })();
                     }
                 });
                 fileWatcherDisposables.push(listener);
