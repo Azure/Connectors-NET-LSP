@@ -411,20 +411,26 @@ must strip surrounding quotes first. See `ValuesMatch()` in `DynamicValuesValida
 
 ### CompilationService assembly identity
 
-The compilation's assembly name is dynamic. When distinguishing source-defined types from
-SDK metadata references, compare against `semanticModel.Compilation.AssemblyName` — never
-hard-code `"LspAnalysis"` or any other compilation name.
+When distinguishing source-defined types from SDK metadata references, compare against
+`semanticModel.Compilation.AssemblyName` rather than hard-coding the compilation name.
+Currently `CompilationService.GetCompilation()` uses `"LspAnalysis"` and
+`CreateSdkMetadataCompilation()` uses `"SdkMetadataCompilation"`, but comparing dynamically
+ensures the validator stays correct if these names change.
 
-### VSTHRD103: No synchronous GetText
+### VSTHRD103: Prefer async GetText in validators
 
-The `VSTHRD103` analyzer blocks synchronous `SyntaxTree.GetText()` and `SourceText.From()`.
-Always use `await tree.GetTextAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false)`.
+In diagnostic validators (which implement `IDiagnosticValidator.ValidateAsync`), prefer
+`await tree.GetTextAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false)`
+over synchronous `SyntaxTree.GetText()`. The `VSTHRD103` analyzer flags synchronous calls
+in async methods. Note: `CompilationService` uses `GetText()` synchronously in a non-async
+context, which is fine.
 
 ### Development: DLL lock workaround
 
 The VS Code extension locks `SdkLspServer.dll` at `Server/bin/Debug/net8.0/`. When iterating
 on the server code while the extension is running:
 
-1. Build to an alternate path: `dotnet build Server/SdkLspServer.csproj -o Q:\temp\lsp-build`
+1. Build to an alternate path: `dotnet build Server/SdkLspServer.csproj -o <writable-folder>`
+   (e.g., `C:\temp\lsp-build` on Windows or `/tmp/lsp-build` on macOS/Linux)
 2. Point `connectorSdk.lspServerPath` in workspace settings to the alternate path
 3. Reload the VS Code window to pick up the new DLL
