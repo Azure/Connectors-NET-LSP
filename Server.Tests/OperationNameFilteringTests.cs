@@ -2,13 +2,11 @@
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //------------------------------------------------------------
 
-using System.Collections.Immutable;
-
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-using SdkLspServer;
+using SdkLspServer.Handlers.CompletionHandler;
 
 namespace Server.Tests;
 
@@ -49,14 +47,14 @@ public class OperationNameFilteringTests
         AttributeSyntax attr = root.DescendantNodes().OfType<AttributeSyntax>()
             .First(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
-        string? connectorName = ReadSiblingAttributeParameterValue(attr, "ConnectorName");
+        string? connectorName = CompletionHandler.ReadSiblingAttributeParameterValue(attr, "ConnectorName");
 
         Assert.AreEqual("Office365", connectorName, "Should read ConnectorName from sibling argument");
     }
 
     /// <summary>
     /// Verifies that when OperationName has an incomplete expression (cursor just typed '='),
-    /// Roslyn's error recovery still produces a parsable attribute with the sibling ConnectorName.
+    /// both the AST path and the text-based fallback can read the sibling ConnectorName.
     /// </summary>
     [TestMethod]
     public void ReadSiblingValue_IncompleteOperationName_ReturnsConnectorName()
@@ -77,36 +75,27 @@ public class OperationNameFilteringTests
             public static class ConnectorNames { public const string Office365 = "office365"; }
             """;
 
+        // Text-based fallback: always deterministic regardless of Roslyn error recovery
+        string contextWindow = "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = ";
+        string? textResult = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
+        Assert.AreEqual(
+            "Office365",
+            textResult,
+            "Text-based fallback should read ConnectorName from sibling argument");
+
+        // AST path: verify Roslyn's error recovery also produces a parsable attribute
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
+        AttributeSyntax? attr = root.DescendantNodes().OfType<AttributeSyntax>()
+            .FirstOrDefault(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
-        // Find position right after "OperationName = "
-        int position = code.IndexOf("OperationName = ", StringComparison.Ordinal) + "OperationName = ".Length;
-
-        SyntaxToken token = root.FindToken(position);
-
-        // Check if the token is inside an AttributeArgumentSyntax
-        AttributeArgumentSyntax? attrArg = token.Parent?.AncestorsAndSelf()
-            .OfType<AttributeArgumentSyntax>()
-            .FirstOrDefault();
-
-        if (attrArg != null)
+        if (attr != null)
         {
-            // AST path: verify sibling value can be read
-            AttributeSyntax? attr = attrArg.AncestorsAndSelf().OfType<AttributeSyntax>().FirstOrDefault();
-            Assert.IsNotNull(attr, "Should find parent attribute");
-
-            string? connectorName = ReadSiblingAttributeParameterValue(attr, "ConnectorName");
+            string? astResult = CompletionHandler.ReadSiblingAttributeParameterValue(attr, "ConnectorName");
             Assert.AreEqual(
                 "Office365",
-                connectorName,
-                "AST path should read ConnectorName from sibling argument even with incomplete OperationName");
-        }
-        else
-        {
-            // AST path failed — this is expected for very incomplete code.
-            // Text-based fallback would handle this.
-            Assert.Inconclusive("Roslyn could not parse incomplete attribute — text-based fallback needed");
+                astResult,
+                "AST path should also read ConnectorName from the parsed attribute");
         }
     }
 
@@ -120,7 +109,7 @@ public class OperationNameFilteringTests
     {
         string contextWindow = "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = ";
 
-        string? connectorName = ExtractParameterValueFromText(contextWindow, "ConnectorName");
+        string? connectorName = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
 
         Assert.AreEqual(
             "Office365",
@@ -142,9 +131,10 @@ public class OperationNameFilteringTests
             "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.AzureBlob, OperationName = AzureBlobTriggerOperations.OnUpdatedFiles)]" +
             "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = ";
 
-        string? connectorName = ExtractParameterValueFromText(contextWindow, "ConnectorName");
+        string? connectorName = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
 
-        // BUG: This currently returns "AzureBlob" because IndexOf finds the FIRST occurrence.
+        // Regression: before issue #74 fix, IndexOf found the FIRST ConnectorName occurrence
+        // and returned "AzureBlob" instead of "Office365".
         Assert.AreEqual(
             "Office365",
             connectorName,
@@ -159,7 +149,7 @@ public class OperationNameFilteringTests
     {
         string contextWindow = "[ConnectorTriggerMetadata(ConnectorName = \"office365\", OperationName = ";
 
-        string? connectorName = ExtractParameterValueFromText(contextWindow, "ConnectorName");
+        string? connectorName = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
 
         Assert.AreEqual("office365", connectorName);
     }
@@ -175,7 +165,7 @@ public class OperationNameFilteringTests
             "    ConnectorName = ConnectorNames.Office365,\n" +
             "    OperationName = ";
 
-        string? connectorName = ExtractParameterValueFromText(contextWindow, "ConnectorName");
+        string? connectorName = CompletionHandler.ExtractParameterValueFromText(contextWindow, "ConnectorName");
 
         Assert.AreEqual("Office365", connectorName);
     }
@@ -188,95 +178,8 @@ public class OperationNameFilteringTests
     {
         string contextWindow = "[ConnectorTriggerMetadata(ConnectorName = ConnectorNames.Office365, OperationName = ";
 
-        string? result = ExtractParameterValueFromText(contextWindow, "Connection");
+        string? result = CompletionHandler.ExtractParameterValueFromText(contextWindow, "Connection");
 
         Assert.IsNull(result);
-    }
-
-    // ── Helpers (replicated from CompletionHandler private methods) ──────────
-    private static string? ReadSiblingAttributeParameterValue(AttributeSyntax attr, string parameterName)
-    {
-        if (attr.ArgumentList is null)
-        {
-            return null;
-        }
-
-        foreach (AttributeArgumentSyntax arg in attr.ArgumentList.Arguments)
-        {
-            if (arg.NameEquals is null ||
-                !string.Equals(arg.NameEquals.Name.Identifier.Text, parameterName, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (arg.Expression is LiteralExpressionSyntax literal &&
-                literal.IsKind(SyntaxKind.StringLiteralExpression))
-            {
-                return literal.Token.ValueText;
-            }
-
-            if (arg.Expression is MemberAccessExpressionSyntax memberAccess)
-            {
-                return memberAccess.Name.Identifier.Text;
-            }
-
-            if (arg.Expression is IdentifierNameSyntax identifier)
-            {
-                return identifier.Identifier.Text;
-            }
-        }
-
-        return null;
-    }
-
-    private static string? ExtractParameterValueFromText(string contextText, string parameterName)
-    {
-        // Narrow to the last attribute in the context so we don't match
-        // parameters from an earlier [ConnectorTriggerMetadata].
-        int lastAttrBracket = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
-        string searchText = lastAttrBracket >= 0
-            ? contextText.Substring(lastAttrBracket)
-            : contextText;
-
-        int paramIndex = searchText.IndexOf(parameterName, StringComparison.Ordinal);
-        if (paramIndex < 0)
-        {
-            return null;
-        }
-
-        string afterParam = searchText.Substring(paramIndex + parameterName.Length).TrimStart();
-        if (!afterParam.StartsWith("=", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        afterParam = afterParam.Substring(1).TrimStart();
-
-        if (afterParam.StartsWith("\"", StringComparison.Ordinal))
-        {
-            int endQuote = afterParam.IndexOf('"', 1);
-            if (endQuote > 1)
-            {
-                return afterParam.Substring(1, endQuote - 1);
-            }
-        }
-
-        int dotIndex = afterParam.IndexOf('.');
-        if (dotIndex >= 0)
-        {
-            string afterDot = afterParam.Substring(dotIndex + 1);
-            int end = 0;
-            while (end < afterDot.Length && (char.IsLetterOrDigit(afterDot[end]) || afterDot[end] == '_'))
-            {
-                end++;
-            }
-
-            if (end > 0)
-            {
-                return afterDot.Substring(0, end);
-            }
-        }
-
-        return null;
     }
 }
