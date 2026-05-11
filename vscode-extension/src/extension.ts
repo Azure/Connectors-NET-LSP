@@ -399,31 +399,43 @@ async function checkForMissingRestore(
         try {
             const content = await fs.promises.readFile(uri.fsPath, "utf-8");
             const referencesSdk = SDK_PACKAGE_NAMES.some((name) =>
-                new RegExp(`<PackageReference\\s+(?:Include|Update)\\s*=\\s*"${name}"`, "i").test(content)
+                new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${name}["']`, "i").test(content)
             );
             if (!referencesSdk) {
                 continue;
             }
 
             // Skip projects with custom intermediate output paths — we can't reliably locate their assets file.
-            // Check both the csproj itself and Directory.Build.props/targets (which MSBuild imports automatically).
+            // Check the csproj itself and Directory.Build.props/targets walking up to the workspace root
+            // (MSBuild searches parent directories for these files).
             const hasCustomIntermediatePath = /(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(content);
             let dirBuildHasCustomPath = false;
             if (!hasCustomIntermediatePath) {
-                const projectDir = path.dirname(uri.fsPath);
-                for (const buildFile of ["Directory.Build.props", "Directory.Build.targets"]) {
-                    const buildFilePath = path.join(projectDir, buildFile);
-                    if (await fileExists(buildFilePath)) {
-                        try {
-                            const buildContent = await fs.promises.readFile(buildFilePath, "utf-8");
-                            if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(buildContent)) {
-                                dirBuildHasCustomPath = true;
-                                break;
+                const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+                let searchDir: string | undefined = path.dirname(uri.fsPath);
+                while (searchDir && (!workspaceRoot || searchDir.startsWith(workspaceRoot))) {
+                    for (const buildFile of ["Directory.Build.props", "Directory.Build.targets"]) {
+                        const buildFilePath = path.join(searchDir, buildFile);
+                        if (await fileExists(buildFilePath)) {
+                            try {
+                                const buildContent = await fs.promises.readFile(buildFilePath, "utf-8");
+                                if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(buildContent)) {
+                                    dirBuildHasCustomPath = true;
+                                    break;
+                                }
+                            } catch {
+                                // Skip unreadable build files
                             }
-                        } catch {
-                            // Skip unreadable build files
                         }
                     }
+                    if (dirBuildHasCustomPath) {
+                        break;
+                    }
+                    const parentDir = path.dirname(searchDir);
+                    if (parentDir === searchDir) {
+                        break;
+                    }
+                    searchDir = parentDir;
                 }
             }
             if (hasCustomIntermediatePath || dirBuildHasCustomPath) {
