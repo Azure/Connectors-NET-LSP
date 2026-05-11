@@ -975,17 +975,27 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// Extracts a parameter value from raw text context. Handles both:
     /// - String literals: ConnectorName = "office365"
     /// - Constant references: ConnectorName = ConnectorNames.Office365.
+    /// When the context window contains multiple attributes (e.g., stacked trigger methods),
+    /// narrows the search to the last attribute to avoid reading values from the wrong one.
     /// </summary>
     private static string? ExtractParameterValueFromText(string contextText, string parameterName)
     {
+        // Narrow to the last attribute in the context so we don't match
+        // parameters from an earlier [ConnectorTriggerMetadata] that the
+        // backwards line scan happened to include (fixes issue #74).
+        int lastAttrBracket = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
+        string searchText = lastAttrBracket >= 0
+            ? contextText.Substring(lastAttrBracket)
+            : contextText;
+
         // Find "ParameterName = " or "ParameterName ="
-        int paramIndex = contextText.IndexOf(parameterName, StringComparison.Ordinal);
+        int paramIndex = searchText.IndexOf(parameterName, StringComparison.Ordinal);
         if (paramIndex < 0)
         {
             return null;
         }
 
-        string afterParam = contextText.Substring(paramIndex + parameterName.Length).TrimStart();
+        string afterParam = searchText.Substring(paramIndex + parameterName.Length).TrimStart();
         if (!afterParam.StartsWith("=", StringComparison.Ordinal))
         {
             return null;

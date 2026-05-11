@@ -399,13 +399,20 @@ public class AttributeCompletionTests
 
     private static string? ExtractParameterValueFromText(string contextText, string parameterName)
     {
-        int paramIndex = contextText.IndexOf(parameterName, StringComparison.Ordinal);
+        // Narrow to the last attribute in the context so we don't match
+        // parameters from an earlier [ConnectorTriggerMetadata].
+        int lastAttrBracket = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
+        string searchText = lastAttrBracket >= 0
+            ? contextText.Substring(lastAttrBracket)
+            : contextText;
+
+        int paramIndex = searchText.IndexOf(parameterName, StringComparison.Ordinal);
         if (paramIndex < 0)
         {
             return null;
         }
 
-        string afterParam = contextText.Substring(paramIndex + parameterName.Length).TrimStart();
+        string afterParam = searchText.Substring(paramIndex + parameterName.Length).TrimStart();
         if (!afterParam.StartsWith("=", StringComparison.Ordinal))
         {
             return null;
