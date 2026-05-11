@@ -158,7 +158,7 @@ async function startLanguageServer(
                 try {
                     // Use ProcessExecution to avoid shell interpretation of the project path
                     const restoreTask = new vscode.Task(
-                        { type: "shell" },
+                        { type: "process" },
                         vscode.TaskScope.Workspace,
                         "dotnet restore",
                         "Connector SDK",
@@ -407,7 +407,7 @@ const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerC
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
 ): Promise<{ needsRestore: boolean; projectDir: string | undefined; projectPath: string | undefined }> {
-    const csprojUris = await vscode.workspace.findFiles("**/*.csproj", "{**/node_modules/**,**/bin/**,**/obj/**}", 50);
+    const csprojUris = await vscode.workspace.findFiles("**/*.csproj", "{**/node_modules/**,**/bin/**,**/obj/**}");
     if (csprojUris.length === 0) {
         return { needsRestore: false, projectDir: undefined, projectPath: undefined };
     }
