@@ -44,10 +44,10 @@ public class OperationNameFilteringTests
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
 
         // Find the OperationName attribute argument
-        AttributeSyntax attr = root.DescendantNodes().OfType<AttributeSyntax>()
+        AttributeSyntax attribute = root.DescendantNodes().OfType<AttributeSyntax>()
             .First(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
-        string? connectorName = CompletionHandler.ReadSiblingAttributeParameterValue(attr, "ConnectorName");
+        string? connectorName = CompletionHandler.ReadSiblingAttributeParameterValue(attribute, "ConnectorName");
 
         Assert.AreEqual("Office365", connectorName, "Should read ConnectorName from sibling argument");
     }
@@ -86,12 +86,12 @@ public class OperationNameFilteringTests
         // AST path: verify Roslyn's error recovery also produces a parsable attribute
         SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
         CompilationUnitSyntax root = tree.GetCompilationUnitRoot();
-        AttributeSyntax? attr = root.DescendantNodes().OfType<AttributeSyntax>()
+        AttributeSyntax? attribute = root.DescendantNodes().OfType<AttributeSyntax>()
             .FirstOrDefault(a => a.Name.ToString().Contains("ConnectorTriggerMetadata", StringComparison.Ordinal));
 
-        if (attr != null)
+        if (attribute != null)
         {
-            string? astResult = CompletionHandler.ReadSiblingAttributeParameterValue(attr, "ConnectorName");
+            string? astResult = CompletionHandler.ReadSiblingAttributeParameterValue(attribute, "ConnectorName");
             Assert.AreEqual(
                 "Office365",
                 astResult,

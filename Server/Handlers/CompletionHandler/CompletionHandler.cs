@@ -933,14 +933,14 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// Reads a sibling parameter value from an AttributeSyntax.
     /// For example, reading "ConnectorName" when the cursor is at "OperationName".
     /// </summary>
-    internal static string? ReadSiblingAttributeParameterValue(AttributeSyntax attr, string parameterName)
+    internal static string? ReadSiblingAttributeParameterValue(AttributeSyntax attribute, string parameterName)
     {
-        if (attr.ArgumentList is null)
+        if (attribute.ArgumentList is null)
         {
             return null;
         }
 
-        foreach (AttributeArgumentSyntax arg in attr.ArgumentList.Arguments)
+        foreach (AttributeArgumentSyntax arg in attribute.ArgumentList.Arguments)
         {
             if (arg.NameEquals is null ||
                 !string.Equals(arg.NameEquals.Name.Identifier.Text, parameterName, StringComparison.Ordinal))
@@ -983,9 +983,9 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
         // Narrow to the last attribute in the context so we don't match
         // parameters from an earlier [ConnectorTriggerMetadata] that the
         // backwards line scan happened to include (fixes issue #74).
-        int lastAttrBracket = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
-        string searchText = lastAttrBracket >= 0
-            ? contextText.Substring(lastAttrBracket)
+        int lastAttributeBracketIndex = contextText.LastIndexOf("[ConnectorTrigger", StringComparison.Ordinal);
+        string searchText = lastAttributeBracketIndex >= 0
+            ? contextText.Substring(lastAttributeBracketIndex)
             : contextText;
 
         // Find "ParameterName = " or "ParameterName ="
