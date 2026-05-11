@@ -398,14 +398,35 @@ async function checkForMissingRestore(
     for (const uri of csprojUris) {
         try {
             const content = await fs.promises.readFile(uri.fsPath, "utf-8");
-            const contentLower = content.toLowerCase();
-            const referencesSdk = SDK_PACKAGE_NAMES.some((name) => contentLower.includes(name.toLowerCase()));
+            const referencesSdk = SDK_PACKAGE_NAMES.some((name) =>
+                new RegExp(`<PackageReference\\s+(?:Include|Update)\\s*=\\s*"${name}"`, "i").test(content)
+            );
             if (!referencesSdk) {
                 continue;
             }
 
-            // Skip projects with custom intermediate output paths — we can't reliably locate their assets file
-            if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(content)) {
+            // Skip projects with custom intermediate output paths — we can't reliably locate their assets file.
+            // Check both the csproj itself and Directory.Build.props/targets (which MSBuild imports automatically).
+            const hasCustomIntermediatePath = /(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(content);
+            let dirBuildHasCustomPath = false;
+            if (!hasCustomIntermediatePath) {
+                const projectDir = path.dirname(uri.fsPath);
+                for (const buildFile of ["Directory.Build.props", "Directory.Build.targets"]) {
+                    const buildFilePath = path.join(projectDir, buildFile);
+                    if (await fileExists(buildFilePath)) {
+                        try {
+                            const buildContent = await fs.promises.readFile(buildFilePath, "utf-8");
+                            if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(buildContent)) {
+                                dirBuildHasCustomPath = true;
+                                break;
+                            }
+                        } catch {
+                            // Skip unreadable build files
+                        }
+                    }
+                }
+            }
+            if (hasCustomIntermediatePath || dirBuildHasCustomPath) {
                 outputChannel.appendLine(
                     `[RestoreCheck] ${path.basename(uri.fsPath)} has custom IntermediateOutputPath — skipping`
                 );
@@ -455,10 +476,10 @@ async function findSdkFromProjectAssets(
                 };
 
                 // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
-                const sdkPackagePrefix = (SDK_PACKAGE_NAME + "/").toLowerCase();
-                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
-                    key.toLowerCase().startsWith(sdkPackagePrefix)
-                );
+                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) => {
+                    const keyLower = key.toLowerCase();
+                    return SDK_PACKAGE_NAMES.some((name) => keyLower.startsWith(name.toLowerCase() + "/"));
+                });
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
                     continue;
