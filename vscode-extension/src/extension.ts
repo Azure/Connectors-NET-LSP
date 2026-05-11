@@ -359,18 +359,23 @@ async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Prom
         return false;
     }
 
-    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", "**/node_modules/**");
+    const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern);
     for (const uri of csprojFiles) {
         try {
-            const content = await fs.promises.readFile(uri.fsPath, "utf-8");
+            const rawBytes = await vscode.workspace.fs.readFile(uri);
+            const content = Buffer.from(rawBytes).toString("utf-8");
             for (const pkgName of SDK_PACKAGE_NAMES) {
                 if (content.includes(pkgName)) {
                     outputChannel.appendLine(`SDK reference found in ${uri.fsPath} (${pkgName})`);
                     return true;
                 }
             }
-        } catch {
-            // File unreadable — skip
+        } catch (err) {
+            outputChannel.appendLine(
+                `Failed to read ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)} — assuming SDK may be present`
+            );
+            return true;
         }
     }
 
