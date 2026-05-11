@@ -361,8 +361,7 @@ function escapeRegExp(text: string): string {
  * Only reads .csproj XML content (small files) — does not parse project.assets.json.
  */
 async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Promise<boolean> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
+    if (!vscode.workspace.workspaceFolders) {
         return false;
     }
 
