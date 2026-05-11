@@ -380,4 +380,80 @@ public class DynamicValuesValidatorTests
         // Assert
         Assert.AreEqual(expected: 0, actual: diagnostics.Count);
     }
+
+    [TestMethod]
+    public async Task ValidateAsync_QuotedCachedValue_MatchesUnquotedLiteral_NoCSdk300Async()
+    {
+        // Arrange — cached value is quote-wrapped (as stored by hover handler)
+        var sdkIndex = DynamicValuesValidatorTests.CreateMockSdkIndex();
+        var validator = DynamicValuesValidatorTests.CreateValidatorWithCache(
+            sdkIndex,
+            connector: "sharepointonline",
+            operation: "GetDataSets",
+            connectionName: "sp-conn",
+            cachedValues: [new DynamicValueItem("\"abc\"", "ABC Site")]);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = DynamicValuesValidatorTests.SdkPreamble + """
+
+            namespace TestApp
+            {
+                class MyFunctions
+                {
+                    private Azure.Connectors.Sdk.SharePointOnline.SharePointOnlineClient client;
+                    async Task Run()
+                    {
+                        await client.GetAllTablesAsync("abc");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
+        Assert.IsNull(result, message: "Should not emit CSDK300 when quote-wrapped cached value matches unquoted literal.");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_CaseDifference_EmitsCSdk300Async()
+    {
+        // Arrange — cached value differs only in case; matching is case-sensitive
+        var sdkIndex = DynamicValuesValidatorTests.CreateMockSdkIndex();
+        var validator = DynamicValuesValidatorTests.CreateValidatorWithCache(
+            sdkIndex,
+            connector: "sharepointonline",
+            operation: "GetDataSets",
+            connectionName: "sp-conn",
+            cachedValues: [new DynamicValueItem("\"https://Contoso.SharePoint.com\"", "Contoso")]);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = DynamicValuesValidatorTests.SdkPreamble + """
+
+            namespace TestApp
+            {
+                class MyFunctions
+                {
+                    private Azure.Connectors.Sdk.SharePointOnline.SharePointOnlineClient client;
+                    async Task Run()
+                    {
+                        await client.GetAllTablesAsync("https://contoso.sharepoint.com");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert — case-sensitive comparison means different casing IS a mismatch
+        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
+        Assert.IsNotNull(result, message: "Expected CSDK300 when literal differs from cached value only by case.");
+    }
 }

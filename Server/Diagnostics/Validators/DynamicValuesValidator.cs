@@ -19,17 +19,22 @@ using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Model
 namespace SdkLspServer.Diagnostics.Validators;
 
 /// <summary>
-/// Validates call sites that pass arguments to SDK connector client methods whose
-/// parameters are annotated with <c>[DynamicValues]</c>.
+/// Validates call sites that pass string literal arguments to SDK connector client
+/// methods whose parameters are annotated with <c>[DynamicValues]</c>.
 /// <para>
-/// When a string literal is passed to a <c>[DynamicValues]</c> parameter and the
-/// dynamic values have been fetched (e.g., by hover or completion), the validator
-/// checks whether the literal is among the cached values. If not, it emits CSDK300.
+/// When a string literal is passed to such a parameter and the dynamic values have
+/// been fetched (e.g., by hover or completion), the validator checks whether the
+/// literal is among the cached values. If not, it emits CSDK300.
 /// </para>
 /// <para>
 /// The validator does <b>not</b> make network calls itself — it reads from the
 /// <see cref="LSPStore.DynamicData"/> cache, which is populated by hover and
 /// completion handlers. This keeps diagnostic validation fast and offline.
+/// </para>
+/// <para>
+/// <b>Limitation:</b> In multi-connection scenarios the cache lookup only finds
+/// values when exactly one connection matches the connector type (auto-resolution).
+/// Explicit connection extraction from the invocation is not implemented.
 /// </para>
 /// Emits diagnostic CSDK300.
 /// </summary>
@@ -86,10 +91,14 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         (_, SemanticModel semanticModel) = this.compilationService
             .GetCompilation(documentUri.ToUri(), tree, filePath);
 
+        // Memoize cached value lookups per (connector, operation) to avoid
+        // redundant connection resolution and cache hits on each invocation.
+        var cachedValuesLookup = new Dictionary<string, List<DynamicValueItem>?>(StringComparer.Ordinal);
+
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateInvocation(invocation, semanticModel, sourceText, diagnostics);
+            this.ValidateInvocation(invocation, semanticModel, sourceText, cachedValuesLookup, diagnostics);
         }
 
         return diagnostics;
@@ -104,6 +113,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         InvocationExpressionSyntax invocation,
         SemanticModel semanticModel,
         SourceText sourceText,
+        Dictionary<string, List<DynamicValueItem>?> cachedValuesLookup,
         List<LspDiagnostic> diagnostics)
     {
         SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation);
@@ -157,7 +167,12 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
             // CSDK300: String literal does not match any cached dynamic value.
             // Only emit when we have cached values to check against.
             string literalValue = literal.Token.ValueText;
-            List<DynamicValueItem>? cachedValues = this.TryGetCachedValues(connectorName, operationId);
+            string cacheKey = $"{connectorName}:{operationId}";
+            if (!cachedValuesLookup.TryGetValue(cacheKey, out List<DynamicValueItem>? cachedValues))
+            {
+                cachedValues = this.TryGetCachedValues(connectorName, operationId);
+                cachedValuesLookup[cacheKey] = cachedValues;
+            }
 
             if (cachedValues is null || cachedValues.Count == 0)
             {
@@ -184,6 +199,12 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
     /// <summary>
     /// Attempts to retrieve cached dynamic values for the given connector and operation.
     /// Tries auto-resolved connection name via <see cref="DynamicValuesHelper.ResolveConnectionByConnectorType"/>.
+    /// <para>
+    /// <b>Limitation:</b> Only auto-resolves when exactly one connection matches the
+    /// connector type. Multi-connection scenarios (where the call site explicitly passes
+    /// a connection name) are not handled — the validator will not find cached values
+    /// and will skip validation (no false positives, but also no detection).
+    /// </para>
     /// </summary>
     private List<DynamicValueItem>? TryGetCachedValues(string? connectorName, string operationId)
     {
@@ -226,7 +247,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
                 ? cachedValue.Substring(1, cachedValue.Length - 2)
                 : cachedValue;
 
-        return string.Equals(normalizedCached, literalValue, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(normalizedCached, literalValue, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -264,7 +285,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         foreach (ArgumentSyntax argument in arguments)
         {
             if (argument.NameColon is not null &&
-                string.Equals(argument.NameColon.Name.Identifier.Text, parameter.Name, StringComparison.Ordinal))
+                string.Equals(argument.NameColon.Name.Identifier.ValueText, parameter.Name, StringComparison.Ordinal))
             {
                 return argument;
             }
