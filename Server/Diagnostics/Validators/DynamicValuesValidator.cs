@@ -98,7 +98,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         foreach (InvocationExpressionSyntax invocation in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            this.ValidateInvocation(invocation, semanticModel, sourceText, cachedValuesLookup, diagnostics);
+            this.ValidateInvocation(invocation, semanticModel, sourceText, cachedValuesLookup, cancellationToken, diagnostics);
         }
 
         return diagnostics;
@@ -114,9 +114,10 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         SemanticModel semanticModel,
         SourceText sourceText,
         Dictionary<(string Connector, string Operation), List<DynamicValueItem>?> cachedValuesLookup,
+        CancellationToken cancellationToken,
         List<LspDiagnostic> diagnostics)
     {
-        SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation);
+        SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
         IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol;
 
         // Fall back to candidate symbols only when there is exactly one candidate
