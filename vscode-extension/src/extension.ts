@@ -352,8 +352,8 @@ async function resolveSdkPath(
 
 const SDK_PACKAGE_NAMES = ["Microsoft.Azure.Connectors.Sdk", "Azure.Connectors.Sdk"] as const;
 
-function escapeRegExp(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
