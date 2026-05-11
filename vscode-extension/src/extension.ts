@@ -156,9 +156,10 @@ async function startLanguageServer(
                 const terminal = vscode.window.createTerminal({ name: "dotnet restore", cwd: restoreCheck.projectDir });
                 terminal.show();
                 terminal.sendText("dotnet restore");
-                // Give the user time to see the restore output, then restart the server
-                vscode.window.onDidCloseTerminal(async (closedTerminal) => {
+                // One-shot listener: dispose after handling the matching terminal close
+                const listener = vscode.window.onDidCloseTerminal(async (closedTerminal) => {
                     if (closedTerminal === terminal) {
+                        listener.dispose();
                         await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
                     }
                 });
@@ -386,14 +387,15 @@ async function scanForUnrestoredSdkProject(
     maxDepth: number
 ): Promise<string | undefined> {
     try {
-        const entries = await fs.promises.readdir(folderPath);
-        const csprojFiles = entries.filter((f) => f.toLowerCase().endsWith(".csproj"));
+        const entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
+        const csprojFiles = entries.filter((f) => f.isFile() && f.name.toLowerCase().endsWith(".csproj"));
 
-        for (const csproj of csprojFiles) {
-            const csprojPath = path.join(folderPath, csproj);
+        for (const csprojEntry of csprojFiles) {
+            const csprojPath = path.join(folderPath, csprojEntry.name);
             try {
                 const content = await fs.promises.readFile(csprojPath, "utf-8");
-                const referencesSdk = SDK_PACKAGE_NAMES.some((name) => content.includes(name));
+                const contentLower = content.toLowerCase();
+                const referencesSdk = SDK_PACKAGE_NAMES.some((name) => contentLower.includes(name.toLowerCase()));
                 if (!referencesSdk) {
                     continue;
                 }
@@ -401,7 +403,7 @@ async function scanForUnrestoredSdkProject(
                 const assetsPath = path.join(folderPath, "obj", "project.assets.json");
                 if (!(await fileExists(assetsPath))) {
                     outputChannel.appendLine(
-                        `[RestoreCheck] ${csproj} references Connector SDK but obj/project.assets.json is missing`
+                        `[RestoreCheck] ${csprojEntry.name} references Connector SDK but obj/project.assets.json is missing`
                     );
                     return folderPath;
                 }
@@ -414,17 +416,12 @@ async function scanForUnrestoredSdkProject(
         const skipDirs = new Set(["node_modules", ".git", "bin", "obj", ".vs", ".vscode", "TestResults"]);
         if (maxDepth > 0) {
             for (const entry of entries) {
-                if (skipDirs.has(entry)) {
+                if (!entry.isDirectory() || skipDirs.has(entry.name)) {
                     continue;
                 }
 
-                const subDir = path.join(folderPath, entry);
+                const subDir = path.join(folderPath, entry.name);
                 try {
-                    const subStat = await fs.promises.stat(subDir);
-                    if (!subStat.isDirectory()) {
-                        continue;
-                    }
-
                     const result = await scanForUnrestoredSdkProject(subDir, outputChannel, maxDepth - 1);
                     if (result) {
                         return result;
