@@ -117,8 +117,16 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         List<LspDiagnostic> diagnostics)
     {
         SymbolInfo symbolInfo = semanticModel.GetSymbolInfo(invocation);
-        IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol
-            ?? symbolInfo.CandidateSymbols.OfType<IMethodSymbol>().FirstOrDefault();
+        IMethodSymbol? methodSymbol = symbolInfo.Symbol as IMethodSymbol;
+
+        // Fall back to candidate symbols only when there is exactly one candidate
+        // to avoid selecting an arbitrary overload from ambiguous resolution.
+        if (methodSymbol is null &&
+            symbolInfo.CandidateSymbols.Length == 1 &&
+            symbolInfo.CandidateSymbols[0] is IMethodSymbol singleCandidate)
+        {
+            methodSymbol = singleCandidate;
+        }
 
         if (methodSymbol is null)
         {
@@ -126,8 +134,9 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
         }
 
         // Only inspect methods on types from the Connectors SDK.
-        // Check both namespace and assembly name to avoid false positives from
-        // user-defined types under the Azure.Connectors.Sdk namespace.
+        // Check both namespace and assembly name. Source-defined types under
+        // Azure.Connectors.Sdk.* are intentionally included because the test
+        // infrastructure defines mock SDK types inline for unit testing.
         string? containingNamespace = methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString();
         string? containingAssembly = methodSymbol.ContainingAssembly?.Name;
         if (containingNamespace is null ||
@@ -202,8 +211,7 @@ internal sealed class DynamicValuesValidator : IDiagnosticValidator
             }
 
             bool isValid = cachedValues.Any(item =>
-                DynamicValuesValidator.ValuesMatch(item.Value, literalValue) ||
-                DynamicValuesValidator.ValuesMatch(item.Description, literalValue));
+                DynamicValuesValidator.ValuesMatch(item.Value, literalValue));
 
             if (!isValid)
             {

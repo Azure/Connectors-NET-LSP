@@ -306,9 +306,9 @@ public class DynamicValuesValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_LiteralMatchesCachedDescription_NoCSdk300Async()
+    public async Task ValidateAsync_LiteralMatchesCachedDescriptionOnly_EmitsCSdk300Async()
     {
-        // Arrange — literal matches the Description (display name), not the Value
+        // Arrange — literal matches Description but not Value; only Value is checked
         var sdkIndex = DynamicValuesValidatorTests.CreateMockSdkIndex();
         var validator = DynamicValuesValidatorTests.CreateValidatorWithCache(
             sdkIndex,
@@ -337,10 +337,10 @@ public class DynamicValuesValidatorTests
             .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Assert
+        // Assert — "Contoso" is only a description, not a valid value
         Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
-        Assert.IsNull(result, message: "Should not emit CSDK300 when the literal matches a cached Description.");
+        Assert.IsNotNull(result, message: "Expected CSDK300 when literal matches only Description, not Value.");
     }
 
     [TestMethod]
