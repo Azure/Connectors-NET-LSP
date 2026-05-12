@@ -95,6 +95,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })
     );
 
+    // Early exit: skip LSP server if no project references the SDK,
+    // unless the developer has explicitly configured an LSP server path.
+    const config = vscode.workspace.getConfiguration("connectorSdk");
+    const explicitServerPath = config.get<string>("lspServerPath");
+    if (!explicitServerPath && !(await workspaceReferencesSdk(outputChannel))) {
+        outputChannel.appendLine(
+            "No project references the Connector SDK — extension inactive. " +
+            "After adding the SDK, run 'Connector SDK: Restart Language Server' or reload the window."
+        );
+        return;
+    }
+
     client = await startLanguageServer(context, outputChannel);
 }
 
@@ -406,6 +418,42 @@ const SDK_PACKAGE_REF_PATTERNS = SDK_PACKAGE_NAMES.map((name) => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${escaped}["']`, "i");
 });
+
+/**
+ * Checks whether any .csproj in the workspace references the Connector SDK.
+ * Only reads .csproj XML content (small files) — does not parse project.assets.json.
+ */
+async function workspaceReferencesSdk(outputChannel: vscode.OutputChannel): Promise<boolean> {
+    if (!vscode.workspace.workspaceFolders) {
+        return false;
+    }
+
+    const excludePattern = "**/{node_modules,bin,obj,.git,.vs}/**";
+    const maxCsprojFiles = 50;
+    const csprojFiles = await vscode.workspace.findFiles("**/*.csproj", excludePattern, maxCsprojFiles + 1);
+    if (csprojFiles.length > maxCsprojFiles) {
+        outputChannel.appendLine(
+            `Found ${csprojFiles.length}+ .csproj files (cap reached) — assuming SDK may be present`
+        );
+        return true;
+    }
+    for (const uri of csprojFiles) {
+        try {
+            const rawBytes = await vscode.workspace.fs.readFile(uri);
+            const content = new TextDecoder("utf-8").decode(rawBytes);
+            if (SDK_PACKAGE_REF_PATTERNS.some((pattern) => pattern.test(content))) {
+                outputChannel.appendLine(`SDK reference found in ${uri.fsPath}`);
+                return true;
+            }
+        } catch (err) {
+            outputChannel.appendLine(
+                `Failed to read ${uri.fsPath}: ${err instanceof Error ? err.message : String(err)} — skipping`
+            );
+        }
+    }
+
+    return false;
+}
 
 async function checkForMissingRestore(
     outputChannel: vscode.OutputChannel
