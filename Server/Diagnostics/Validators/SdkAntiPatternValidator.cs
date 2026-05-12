@@ -122,48 +122,25 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                         continue;
                     }
 
-                    // Try connector-scoped validation first when ConnectorName is present.
+                    // When ConnectorName is present, AttributeValidator already
+                    // validates OperationName (CSDK009). Skip to avoid duplicates.
                     string? connectorName = SdkAntiPatternValidator.GetConnectorNameFromAttribute(attribute);
 
-                    // Resolve constant-style ConnectorName (e.g., "Office365" from
-                    // ConnectorNames.Office365) to the canonical value ("office365")
-                    // using the SDK index's ConnectorNameConstants.
                     if (connectorName is not null)
                     {
-                        SdkConstant? matchedConnector = sdkIndex.ConnectorNameConstants
-                            .FirstOrDefault(connector =>
-                                string.Equals(connector.FieldName, connectorName, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(connector.Value, connectorName, StringComparison.OrdinalIgnoreCase));
-
-                        if (matchedConnector is not null)
-                        {
-                            connectorName = matchedConnector.Value;
-                        }
-                    }
-
-                    bool found;
-                    string message;
-
-                    if (connectorName is not null)
-                    {
-                        // When ConnectorName is present and resolves, AttributeValidator
-                        // already validates OperationName (CSDK009). Skip to avoid
-                        // duplicate diagnostics.
                         continue;
                     }
-                    else
+
+                    bool found = sdkIndex.GetAllTriggerOperations().Any(operation =>
+                        string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
+
+                    if (found)
                     {
-                        found = sdkIndex.GetAllTriggerOperations().Any(operation =>
-                            string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
-
-                        if (found)
-                        {
-                            continue;
-                        }
-
-                        message = $"Operation '{operationName}' does not match any known connector operation in the SDK index.";
+                        continue;
                     }
+
+                    string message = $"Operation '{operationName}' does not match any known connector operation in the SDK index.";
 
                     var range = operationArgument is not null
                         ? ValidatorHelpers.GetArgumentValueRange(operationArgument, sourceText)
@@ -423,10 +400,19 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                     continue;
                 }
 
-                // Check if any argument passes the cancellation token.
+                // Check if any argument resolves to a CancellationToken type.
+                // Uses semantic analysis to handle non-identifier expressions
+                // (e.g., cts.Token, default, CancellationToken.None).
                 bool passesCancellationToken = invocation.ArgumentList.Arguments.Any(argument =>
-                    argument.Expression is IdentifierNameSyntax identifier &&
-                    string.Equals(identifier.Identifier.Text, cancellationTokenParamName, StringComparison.Ordinal));
+                {
+                    ITypeSymbol? argumentType = semanticModel.GetTypeInfo(argument.Expression, cancellationToken).Type;
+                    return argumentType is not null &&
+                        string.Equals(argumentType.Name, "CancellationToken", StringComparison.Ordinal) &&
+                        string.Equals(
+                            argumentType.ContainingNamespace?.ToDisplayString(),
+                            "System.Threading",
+                            StringComparison.Ordinal);
+                });
 
                 if (!passesCancellationToken)
                 {
