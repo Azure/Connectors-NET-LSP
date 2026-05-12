@@ -79,9 +79,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
     /// <summary>
     /// CSDK401: Checks <c>[ConnectorOperation]</c> attribute operation values against
-    /// known operations in the SDK index. Unlike CSDK009 in <see cref="AttributeValidator"/>,
-    /// this also handles positional arguments and checks independently of connector name
-    /// resolution.
+    /// known operations in the SDK index. When a ConnectorName is present on the
+    /// attribute, validates against that connector's operations first; falls back
+    /// to all operations only when ConnectorName is absent or unresolvable.
+    /// Also handles positional arguments with precise diagnostic range placement.
     /// </summary>
     private static void CheckConnectorOperationValues(
         CompilationUnitSyntax root,
@@ -109,30 +110,65 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                         continue;
                     }
 
-                    string? operationName = SdkAntiPatternValidator.GetOperationNameFromAttribute(attribute);
+                    (string? operationName, AttributeArgumentSyntax? operationArgument) =
+                        SdkAntiPatternValidator.GetOperationNameAndArgumentFromAttribute(attribute);
 
                     if (operationName is null)
                     {
                         continue;
                     }
 
-                    bool found = sdkIndex.GetAllTriggerOperations().Any(operation =>
-                        string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
+                    // Try connector-scoped validation first when ConnectorName is present.
+                    string? connectorName = SdkAntiPatternValidator.GetConnectorNameFromAttribute(attribute);
+                    bool found;
+                    string message;
 
-                    if (!found)
+                    if (connectorName is not null)
                     {
-                        AttributeArgumentSyntax? operationArgument = ValidatorHelpers.FindNamedArgument(attribute, "OperationName");
-                        var range = operationArgument is not null
-                            ? ValidatorHelpers.GetArgumentValueRange(operationArgument, sourceText)
-                            : ValidatorHelpers.GetAttributeNameRange(attribute, sourceText);
+                        var connectorOperations = sdkIndex.GetTriggerOperations(connectorName);
+                        found = connectorOperations.Any(operation =>
+                            string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
 
-                        diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
-                            range,
-                            LspDiagnosticSeverity.Warning,
-                            DiagnosticCodes.ConnectorOperationValueUnknown,
-                            $"Operation '{operationName}' does not match any known connector operation in the SDK index."));
+                        if (!found)
+                        {
+                            // Check if it exists in a different connector for a more helpful message.
+                            bool foundInOther = sdkIndex.GetAllTriggerOperations().Any(operation =>
+                                string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
+
+                            message = foundInOther
+                                ? $"Operation '{operationName}' exists in the SDK but does not belong to connector '{connectorName}'."
+                                : $"Operation '{operationName}' does not match any known connector operation in the SDK index.";
+                        }
+                        else
+                        {
+                            continue;
+                        }
                     }
+                    else
+                    {
+                        found = sdkIndex.GetAllTriggerOperations().Any(operation =>
+                            string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
+
+                        if (found)
+                        {
+                            continue;
+                        }
+
+                        message = $"Operation '{operationName}' does not match any known connector operation in the SDK index.";
+                    }
+
+                    var range = operationArgument is not null
+                        ? ValidatorHelpers.GetArgumentValueRange(operationArgument, sourceText)
+                        : ValidatorHelpers.GetAttributeNameRange(attribute, sourceText);
+
+                    diagnostics.Add(ValidatorHelpers.CreateDiagnostic(
+                        range,
+                        LspDiagnosticSeverity.Warning,
+                        DiagnosticCodes.ConnectorOperationValueUnknown,
+                        message));
                 }
             }
         }
@@ -166,11 +202,9 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                 continue;
             }
 
-            string typeName = typeSyntax.ToString();
-
-            // Get simple type name (handle qualified names)
-            int lastDot = typeName.LastIndexOf('.');
-            string simpleTypeName = lastDot >= 0 ? typeName.Substring(lastDot + 1) : typeName;
+            // Unwrap nullable, qualified, and alias-qualified type syntax nodes
+            // to extract the simple type name (handles T?, Ns.T, global::T).
+            string simpleTypeName = SdkAntiPatternValidator.GetSimpleTypeName(typeSyntax);
 
             if (!simpleTypeName.EndsWith("Input", StringComparison.Ordinal))
             {
@@ -230,12 +264,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                 continue;
             }
 
-            bool referencesStatusCode = catchClause.Block.DescendantNodes()
-                .OfType<MemberAccessExpressionSyntax>()
-                .Any(access =>
-                    string.Equals(access.Name.Identifier.Text, "StatusCode", StringComparison.Ordinal) &&
-                    access.Expression is IdentifierNameSyntax identifier &&
-                    string.Equals(identifier.Identifier.Text, exceptionVariableName, StringComparison.Ordinal));
+            // Check both regular member access (ex.StatusCode) and conditional
+            // access (ex?.StatusCode) so that null-safe patterns are recognized.
+            bool referencesStatusCode = SdkAntiPatternValidator.BlockReferencesStatusCode(
+                catchClause.Block, exceptionVariableName);
 
             if (!referencesStatusCode)
             {
@@ -319,11 +351,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Find CancellationToken parameters in this method.
-            string? cancellationTokenParamName = method.ParameterList.Parameters
-                .Where(parameter => SdkAntiPatternValidator.IsCancellationTokenType(parameter.Type))
-                .Select(parameter => parameter.Identifier.Text)
-                .FirstOrDefault();
+            // Find CancellationToken parameters using the semantic model for
+            // reliable resolution (handles aliases, global:: qualification, etc.).
+            string? cancellationTokenParamName = SdkAntiPatternValidator.FindCancellationTokenParameterName(
+                method, semanticModel, cancellationToken);
 
             if (cancellationTokenParamName is null)
             {
@@ -377,17 +408,19 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
     }
 
     /// <summary>
-    /// Extracts the operation name from a <c>[ConnectorOperation]</c> attribute,
-    /// checking the named <c>OperationName</c> argument first, then falling back
-    /// to the first positional argument.
+    /// Extracts the operation name and corresponding argument syntax from a
+    /// <c>[ConnectorOperation]</c> attribute, checking the named <c>OperationName</c>
+    /// argument first, then falling back to the first positional argument.
+    /// Returns both the value and the argument node for precise diagnostic placement.
     /// </summary>
-    private static string? GetOperationNameFromAttribute(AttributeSyntax attribute)
+    private static (string? OperationName, AttributeArgumentSyntax? Argument) GetOperationNameAndArgumentFromAttribute(
+        AttributeSyntax attribute)
     {
         AttributeArgumentSyntax? namedArgument = ValidatorHelpers.FindNamedArgument(attribute, "OperationName");
 
         if (namedArgument is not null)
         {
-            return ValidatorHelpers.ExtractStringValue(namedArgument);
+            return (ValidatorHelpers.ExtractStringValue(namedArgument), namedArgument);
         }
 
         // Fall back to first positional argument.
@@ -398,7 +431,105 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
             if (first.NameEquals is null && first.NameColon is null)
             {
-                return ValidatorHelpers.ExtractStringValue(first);
+                return (ValidatorHelpers.ExtractStringValue(first), first);
+            }
+        }
+
+        return (null, null);
+    }
+
+    /// <summary>
+    /// Extracts the ConnectorName value from a <c>[ConnectorOperation]</c> attribute
+    /// when present as a named argument.
+    /// </summary>
+    private static string? GetConnectorNameFromAttribute(AttributeSyntax attribute)
+    {
+        AttributeArgumentSyntax? connectorNameArgument = ValidatorHelpers.FindNamedArgument(attribute, "ConnectorName");
+
+        if (connectorNameArgument is null)
+        {
+            return null;
+        }
+
+        return ValidatorHelpers.ExtractStringValue(connectorNameArgument);
+    }
+
+    /// <summary>
+    /// Extracts the simple (unqualified, non-nullable) type name from a type syntax node.
+    /// Handles <c>Nullable&lt;T&gt;</c> (<c>T?</c>), qualified names (<c>Ns.T</c>),
+    /// alias-qualified names (<c>global::T</c>), and generic names (<c>T&lt;U&gt;</c>).
+    /// </summary>
+    private static string GetSimpleTypeName(TypeSyntax typeSyntax)
+    {
+        return typeSyntax switch
+        {
+            NullableTypeSyntax nullable => SdkAntiPatternValidator.GetSimpleTypeName(nullable.ElementType),
+            QualifiedNameSyntax qualified => SdkAntiPatternValidator.GetSimpleTypeName(qualified.Right),
+            AliasQualifiedNameSyntax aliasQualified => SdkAntiPatternValidator.GetSimpleTypeName(aliasQualified.Name),
+            GenericNameSyntax generic => generic.Identifier.Text,
+            IdentifierNameSyntax identifier => identifier.Identifier.Text,
+            _ => typeSyntax.ToString(),
+        };
+    }
+
+    /// <summary>
+    /// Checks whether a catch block references <c>StatusCode</c> on the exception variable,
+    /// handling both regular member access (<c>ex.StatusCode</c>) and conditional access
+    /// (<c>ex?.StatusCode</c>).
+    /// </summary>
+    private static bool BlockReferencesStatusCode(BlockSyntax block, string exceptionVariableName)
+    {
+        foreach (SyntaxNode node in block.DescendantNodes())
+        {
+            // Regular: ex.StatusCode
+            if (node is MemberAccessExpressionSyntax memberAccess &&
+                string.Equals(memberAccess.Name.Identifier.Text, "StatusCode", StringComparison.Ordinal) &&
+                memberAccess.Expression is IdentifierNameSyntax memberIdentifier &&
+                string.Equals(memberIdentifier.Identifier.Text, exceptionVariableName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            // Conditional: ex?.StatusCode
+            if (node is ConditionalAccessExpressionSyntax conditionalAccess &&
+                conditionalAccess.Expression is IdentifierNameSyntax conditionalIdentifier &&
+                string.Equals(conditionalIdentifier.Identifier.Text, exceptionVariableName, StringComparison.Ordinal) &&
+                conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding &&
+                string.Equals(memberBinding.Name.Identifier.Text, "StatusCode", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Uses the semantic model to find a <c>CancellationToken</c> parameter in the
+    /// given method declaration. More reliable than syntax-string checks because it
+    /// handles aliases, <c>global::</c> qualification, and fully-qualified type names.
+    /// </summary>
+    private static string? FindCancellationTokenParameterName(
+        MethodDeclarationSyntax method,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken)
+    {
+        IMethodSymbol? methodSymbol = semanticModel.GetDeclaredSymbol(method, cancellationToken);
+
+        if (methodSymbol is null)
+        {
+            return null;
+        }
+
+        foreach (IParameterSymbol parameter in methodSymbol.Parameters)
+        {
+            if (string.Equals(parameter.Type.Name, "CancellationToken", StringComparison.Ordinal) &&
+                string.Equals(
+                    parameter.Type.ContainingNamespace?.ToDisplayString(),
+                    "System.Threading",
+                    StringComparison.Ordinal))
+            {
+                return parameter.Name;
             }
         }
 
@@ -455,21 +586,5 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         }
 
         return true;
-    }
-
-    /// <summary>
-    /// Determines whether a type syntax node represents <c>CancellationToken</c>.
-    /// </summary>
-    private static bool IsCancellationTokenType(TypeSyntax? type)
-    {
-        if (type is null)
-        {
-            return false;
-        }
-
-        string typeName = type.ToString();
-
-        return string.Equals(typeName, "CancellationToken", StringComparison.Ordinal) ||
-               typeName.EndsWith(".CancellationToken", StringComparison.Ordinal);
     }
 }
