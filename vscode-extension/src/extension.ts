@@ -13,6 +13,7 @@ let client: LanguageClient | undefined;
 let fileWatcherDisposables: vscode.Disposable[] = [];
 let traceOutputChannel: vscode.OutputChannel | undefined;
 let tokenRefreshTimer: NodeJS.Timeout | undefined;
+let restorePromptShown = false;
 
 async function fileExists(filePath: string): Promise<boolean> {
     try {
@@ -142,6 +143,66 @@ async function startLanguageServer(
         } else {
             args.push("--sdk", sdkResult.paths[0]);
             outputChannel.appendLine(`SDK .nupkg: ${sdkResult.paths[0]} (source: ${sdkResult.source})`);
+        }
+    } else if (!restorePromptShown && !config.get<string>("sdkPath") && !config.get<string>("sdkNupkgPath")) {
+        const restoreCheck = await checkForMissingRestore(outputChannel);
+        if (restoreCheck.needsRestore) {
+            restorePromptShown = true;
+            const action = await vscode.window.showInformationMessage(
+                "Connector SDK IntelliSense requires package restore. Run `dotnet restore`?",
+                "Restore"
+            );
+            if (action === "Restore" && restoreCheck.projectDir && restoreCheck.projectPath) {
+                const projectDir = restoreCheck.projectDir;
+                const projectFile = restoreCheck.projectPath;
+                try {
+                    // Use ProcessExecution to avoid shell interpretation of the project path
+                    const restoreTask = new vscode.Task(
+                        { type: "process" },
+                        vscode.TaskScope.Workspace,
+                        "dotnet restore",
+                        "Connector SDK",
+                        new vscode.ProcessExecution("dotnet", ["restore", projectFile], { cwd: projectDir })
+                    );
+                    restoreTask.presentationOptions = { reveal: vscode.TaskRevealKind.Always };
+                    // Register the listener BEFORE executing the task so we don't miss near-instant completions.
+                    // Stored in a separate variable (not fileWatcherDisposables) so a manual server restart
+                    // during restore doesn't dispose it prematurely.
+                    const listener = vscode.tasks.onDidEndTaskProcess((e) => {
+                        if (e.execution.task === restoreTask) {
+                            listener.dispose();
+                            (async () => {
+                                try {
+                                    const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+                                    if (await fileExists(assetsPath)) {
+                                        await vscode.commands.executeCommand("connectorSdk.restartLanguageServer");
+                                    } else {
+                                        restorePromptShown = false;
+                                        vscode.window.showWarningMessage(
+                                            "Connector SDK: dotnet restore did not produce project.assets.json. IntelliSense remains disabled."
+                                        );
+                                    }
+                                } catch (err) {
+                                    const message = err instanceof Error ? err.message : String(err);
+                                    outputChannel.appendLine(`[RestoreCheck] Post-restore error: ${message}`);
+                                }
+                            })();
+                        }
+                    });
+                    context.subscriptions.push(listener);
+                    await vscode.tasks.executeTask(restoreTask);
+                    // Return early — don't start the server without SDK; the task completion handler will restart it
+                    return undefined;
+                } catch (err) {
+                    restorePromptShown = false;
+                    const message = err instanceof Error ? err.message : String(err);
+                    outputChannel.appendLine(`[RestoreCheck] Failed to execute restore task: ${message}`);
+                    vscode.window.showWarningMessage(
+                        "Connector SDK: Failed to run dotnet restore. Check the output channel for details."
+                    );
+                    // Fall through to start the server without SDK
+                }
+            }
         }
     }
 
@@ -339,6 +400,104 @@ async function resolveSdkPath(
 }
 
 const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
+const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
+const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerCase() + "/");
+const SDK_PACKAGE_REF_PATTERNS = SDK_PACKAGE_NAMES.map((name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`<PackageReference\\b[^>]*\\b(?:Include|Update)\\s*=\\s*["']${escaped}["']`, "i");
+});
+
+async function checkForMissingRestore(
+    outputChannel: vscode.OutputChannel
+): Promise<{ needsRestore: boolean; projectDir: string | undefined; projectPath: string | undefined }> {
+    const csprojUris = await vscode.workspace.findFiles("**/*.csproj", "{**/node_modules/**,**/bin/**,**/obj/**}");
+    if (csprojUris.length === 0) {
+        return { needsRestore: false, projectDir: undefined, projectPath: undefined };
+    }
+
+    // Only consider projects within 3 directory levels of a workspace folder root,
+    // matching the depth that findSdkFromProjectAssets uses for SDK discovery.
+    const maxDepth = 3;
+    const eligibleUris = csprojUris.filter((uri) => {
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!folder) {
+            return false;
+        }
+        const rel = path.relative(folder.uri.fsPath, path.dirname(uri.fsPath));
+        const depth = rel ? rel.split(path.sep).length : 0;
+        return depth <= maxDepth;
+    });
+
+    for (const uri of eligibleUris) {
+        try {
+            const content = await fs.promises.readFile(uri.fsPath, "utf-8");
+            const referencesSdk = SDK_PACKAGE_REF_PATTERNS.some((pattern) => pattern.test(content));
+            if (!referencesSdk) {
+                continue;
+            }
+
+            // Skip projects with custom intermediate output paths — we can't reliably locate their assets file.
+            // Check the csproj itself and Directory.Build.props/targets walking up to the workspace root
+            // (MSBuild searches parent directories for these files).
+            const hasCustomIntermediatePath = /(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(content);
+            let dirBuildHasCustomPath = false;
+            if (!hasCustomIntermediatePath) {
+                const workspaceRoot = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+                let searchDir: string | undefined = path.dirname(uri.fsPath);
+                const isWithinWorkspace = (dir: string): boolean => {
+                    if (!workspaceRoot) {
+                        return true;
+                    }
+                    const rel = path.relative(workspaceRoot, dir);
+                    return !rel.startsWith("..") && !path.isAbsolute(rel);
+                };
+                while (searchDir && isWithinWorkspace(searchDir)) {
+                    for (const buildFile of ["Directory.Build.props", "Directory.Build.targets"]) {
+                        const buildFilePath = path.join(searchDir, buildFile);
+                        if (await fileExists(buildFilePath)) {
+                            try {
+                                const buildContent = await fs.promises.readFile(buildFilePath, "utf-8");
+                                if (/(<BaseIntermediateOutputPath|<IntermediateOutputPath)/i.test(buildContent)) {
+                                    dirBuildHasCustomPath = true;
+                                    break;
+                                }
+                            } catch {
+                                // Skip unreadable build files
+                            }
+                        }
+                    }
+                    if (dirBuildHasCustomPath) {
+                        break;
+                    }
+                    const parentDir = path.dirname(searchDir);
+                    if (parentDir === searchDir) {
+                        break;
+                    }
+                    searchDir = parentDir;
+                }
+            }
+            if (hasCustomIntermediatePath || dirBuildHasCustomPath) {
+                outputChannel.appendLine(
+                    `[RestoreCheck] ${path.basename(uri.fsPath)} has custom IntermediateOutputPath — skipping`
+                );
+                continue;
+            }
+
+            const projectDir = path.dirname(uri.fsPath);
+            const assetsPath = path.join(projectDir, "obj", "project.assets.json");
+            if (!(await fileExists(assetsPath))) {
+                outputChannel.appendLine(
+                    `[RestoreCheck] ${path.basename(uri.fsPath)} references Connector SDK but obj/project.assets.json is missing`
+                );
+                return { needsRestore: true, projectDir, projectPath: uri.fsPath };
+            }
+        } catch {
+            // Skip unreadable csproj files
+        }
+    }
+
+    return { needsRestore: false, projectDir: undefined, projectPath: undefined };
+}
 
 async function findSdkFromProjectAssets(
     folderPath: string,
@@ -367,10 +526,10 @@ async function findSdkFromProjectAssets(
                 };
 
                 // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
-                const sdkPackagePrefix = (SDK_PACKAGE_NAME + "/").toLowerCase();
-                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) =>
-                    key.toLowerCase().startsWith(sdkPackagePrefix)
-                );
+                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) => {
+                    const keyLower = key.toLowerCase();
+                    return SDK_PACKAGE_PREFIXES_LOWER.some((prefix) => keyLower.startsWith(prefix));
+                });
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
                     continue;
