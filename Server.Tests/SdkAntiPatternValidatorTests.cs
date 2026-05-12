@@ -200,8 +200,8 @@ public sealed class SdkAntiPatternValidatorTests
     [TestMethod]
     public async Task ValidateAsync_ConnectorOperationConstantReference_NoCSdk401Async()
     {
-        // Arrange: ConnectorName = ConnectorNames.Office365 resolves to FieldName "Office365"
-        // which should be mapped to canonical value "office365" for lookup.
+        // Arrange: When ConnectorName is present (including constant references),
+        // CSDK401 is skipped entirely — AttributeValidator (CSDK009) handles it.
         var sdkIndex = SdkAntiPatternValidatorTests.CreateMockSdkIndex();
         var validator = SdkAntiPatternValidatorTests.CreateValidator(sdkIndex);
         var uri = DocumentUri.From("file:///test.cs");

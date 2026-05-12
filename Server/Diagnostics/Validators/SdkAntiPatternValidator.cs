@@ -19,7 +19,7 @@ namespace SdkLspServer.Diagnostics.Validators;
 /// Emits diagnostics CSDK401–CSDK405.
 /// <list type="bullet">
 /// <item>CSDK401 — <c>[ConnectorOperation]</c> attribute value doesn't match any known operation.</item>
-/// <item>CSDK402 — <c>*Input</c> type used where <c>*Output</c> is expected (or vice versa).</item>
+/// <item>CSDK402 — <c>*Input</c> type used where <c>*Output</c> is expected.</item>
 /// <item>CSDK403 — Catching <c>ConnectorException</c> without checking <c>StatusCode</c>.</item>
 /// <item>CSDK404 — Async connector method called without <c>await</c>.</item>
 /// <item>CSDK405 — <c>CancellationToken</c> available but not passed to connector API call.</item>
@@ -79,9 +79,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
     /// <summary>
     /// CSDK401: Checks <c>[ConnectorOperation]</c> attribute operation values against
-    /// known operations in the SDK index. When a ConnectorName is present on the
-    /// attribute, validates against that connector's operations first; falls back
-    /// to all operations only when ConnectorName is absent or unresolvable.
+    /// known operations in the SDK index. When ConnectorName is present,
+    /// validation is deferred to <see cref="AttributeValidator"/> (CSDK009).
+    /// This check only fires when ConnectorName is absent, validating the
+    /// operation name against all known operations across all connectors.
     /// Also handles positional arguments with precise diagnostic range placement.
     /// </summary>
     private static void CheckConnectorOperationValues(

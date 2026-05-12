@@ -108,7 +108,7 @@ internal static class DiagnosticCodes
     /// <summary><c>[ConnectorOperation]</c> attribute value doesn't match any known operation in the SDK index.</summary>
     public const string ConnectorOperationValueUnknown = "CSDK401";
 
-    /// <summary>Input type used where output type is expected, or vice versa.</summary>
+    /// <summary>Input type used where output type is expected.</summary>
     public const string WrongPayloadTypeDirection = "CSDK402";
 
     /// <summary>Catching <c>ConnectorException</c> without checking <c>StatusCode</c> property.</summary>
