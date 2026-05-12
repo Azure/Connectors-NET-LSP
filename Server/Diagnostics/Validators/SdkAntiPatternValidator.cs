@@ -59,9 +59,9 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
             .ConfigureAwait(continueOnCapturedContext: false);
 
         // Syntax-only checks (no compilation needed)
-        SdkAntiPatternValidator.CheckConnectorOperationValues(root, sourceText, sdkIndex, diagnostics);
-        SdkAntiPatternValidator.CheckPayloadTypeDirection(root, sourceText, sdkIndex, diagnostics);
-        SdkAntiPatternValidator.CheckConnectorExceptionHandling(root, sourceText, diagnostics);
+        SdkAntiPatternValidator.CheckConnectorOperationValues(root, sourceText, sdkIndex, cancellationToken, diagnostics);
+        SdkAntiPatternValidator.CheckPayloadTypeDirection(root, sourceText, sdkIndex, cancellationToken, diagnostics);
+        SdkAntiPatternValidator.CheckConnectorExceptionHandling(root, sourceText, cancellationToken, diagnostics);
 
         // Semantic checks (require compilation)
         string? filePath = string.Equals(documentUri.Scheme, "file", StringComparison.OrdinalIgnoreCase)
@@ -88,6 +88,7 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         CompilationUnitSyntax root,
         SourceText sourceText,
         SdkIndex? sdkIndex,
+        CancellationToken cancellationToken,
         List<LspDiagnostic> diagnostics)
     {
         if (sdkIndex is null)
@@ -99,6 +100,8 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         {
             foreach (AttributeListSyntax attributeList in method.AttributeLists)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 foreach (AttributeSyntax attribute in attributeList.Attributes)
                 {
                     string attributeName = attribute.Name.ToString();
@@ -184,6 +187,7 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         CompilationUnitSyntax root,
         SourceText sourceText,
         SdkIndex? sdkIndex,
+        CancellationToken cancellationToken,
         List<LspDiagnostic> diagnostics)
     {
         if (sdkIndex is null)
@@ -193,6 +197,7 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
         foreach (LocalDeclarationStatementSyntax localDecl in root.DescendantNodes().OfType<LocalDeclarationStatementSyntax>())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             TypeSyntax typeSyntax = localDecl.Declaration.Type;
 
             // Skip 'var' declarations — can't determine type name from syntax alone.
@@ -237,10 +242,12 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
     private static void CheckConnectorExceptionHandling(
         CompilationUnitSyntax root,
         SourceText sourceText,
+        CancellationToken cancellationToken,
         List<LspDiagnostic> diagnostics)
     {
         foreach (CatchClauseSyntax catchClause in root.DescendantNodes().OfType<CatchClauseSyntax>())
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (catchClause.Declaration is null)
             {
                 continue;
@@ -307,8 +314,13 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                 continue;
             }
 
+            // Unwrap chained invocations like client.SendEmailAsync(...).ConfigureAwait(false)
+            // to find the underlying connector SDK method call.
+            InvocationExpressionSyntax connectorInvocation = SdkAntiPatternValidator.UnwrapChainedInvocation(
+                invocation);
+
             IMethodSymbol? methodSymbol = SdkAntiPatternValidator.ResolveMethodSymbol(
-                invocation, semanticModel, cancellationToken);
+                connectorInvocation, semanticModel, cancellationToken);
 
             if (methodSymbol is null)
             {
@@ -383,7 +395,11 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
                 // Check if the SDK method has a CancellationToken parameter.
                 bool methodAcceptsCancellationToken = methodSymbol.Parameters.Any(parameter =>
-                    string.Equals(parameter.Type.Name, "CancellationToken", StringComparison.Ordinal));
+                    string.Equals(parameter.Type.Name, "CancellationToken", StringComparison.Ordinal) &&
+                    string.Equals(
+                        parameter.Type.ContainingNamespace?.ToDisplayString(),
+                        "System.Threading",
+                        StringComparison.Ordinal));
 
                 if (!methodAcceptsCancellationToken)
                 {
@@ -452,6 +468,27 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
         }
 
         return ValidatorHelpers.ExtractStringValue(connectorNameArgument);
+    }
+
+    /// <summary>
+    /// Unwraps chained invocations to find the innermost invocation expression.
+    /// For example, <c>client.SendEmailAsync(...).ConfigureAwait(false)</c> resolves
+    /// to the <c>client.SendEmailAsync(...)</c> invocation so the SDK method symbol
+    /// can be resolved instead of <c>ConfigureAwait</c>.
+    /// </summary>
+    private static InvocationExpressionSyntax UnwrapChainedInvocation(InvocationExpressionSyntax invocation)
+    {
+        InvocationExpressionSyntax current = invocation;
+
+        // Walk down member-access chains: outer.Method() where outer is itself
+        // an invocation (i.e., inner.SdkMethod().ConfigureAwait(...)).
+        while (current.Expression is MemberAccessExpressionSyntax memberAccess &&
+               memberAccess.Expression is InvocationExpressionSyntax innerInvocation)
+        {
+            current = innerInvocation;
+        }
+
+        return current;
     }
 
     /// <summary>
