@@ -145,26 +145,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
                     if (connectorName is not null)
                     {
-                        var connectorOperations = sdkIndex.GetTriggerOperations(connectorName);
-                        found = connectorOperations.Any(operation =>
-                            string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
-
-                        if (!found)
-                        {
-                            // Check if it exists in a different connector for a more helpful message.
-                            bool foundInOther = sdkIndex.GetAllTriggerOperations().Any(operation =>
-                                string.Equals(operation.Value, operationName, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(operation.FieldName, operationName, StringComparison.OrdinalIgnoreCase));
-
-                            message = foundInOther
-                                ? $"Operation '{operationName}' exists in the SDK but does not belong to connector '{connectorName}'."
-                                : $"Operation '{operationName}' does not match any known connector operation in the SDK index.";
-                        }
-                        else
-                        {
-                            continue;
-                        }
+                        // When ConnectorName is present and resolves, AttributeValidator
+                        // already validates OperationName (CSDK009). Skip to avoid
+                        // duplicate diagnostics.
+                        continue;
                     }
                     else
                     {

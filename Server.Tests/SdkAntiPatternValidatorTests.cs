@@ -85,7 +85,7 @@ public sealed class SdkAntiPatternValidatorTests
     [TestMethod]
     public async Task ValidateAsync_ConnectorOperationUnknownOperation_EmitsCSdk401Async()
     {
-        // Arrange
+        // Arrange: No ConnectorName — CSDK401 checks against all operations
         var sdkIndex = SdkAntiPatternValidatorTests.CreateMockSdkIndex();
         var validator = SdkAntiPatternValidatorTests.CreateValidator(sdkIndex);
         var uri = DocumentUri.From("file:///test.cs");
@@ -94,12 +94,11 @@ public sealed class SdkAntiPatternValidatorTests
             [AttributeUsage(AttributeTargets.Method)]
             public sealed class ConnectorOperationAttribute : Attribute
             {
-                public string ConnectorName { get; set; } = "";
                 public string OperationName { get; set; } = "";
             }
             public class Test
             {
-                [ConnectorOperation(ConnectorName = "office365", OperationName = "NonexistentOp")]
+                [ConnectorOperation(OperationName = "NonexistentOp")]
                 public void MyMethod() { }
             }
             """;
@@ -152,9 +151,10 @@ public sealed class SdkAntiPatternValidatorTests
     }
 
     [TestMethod]
-    public async Task ValidateAsync_ConnectorOperationWrongConnector_EmitsCSdk401WithContextAsync()
+    public async Task ValidateAsync_ConnectorOperationWithConnectorName_SkipsCSdk401Async()
     {
-        // Arrange: OnNewEmail exists in office365 but we attribute it to a different connector
+        // Arrange: When ConnectorName is present, AttributeValidator handles validation
+        // (CSDK009) so SdkAntiPatternValidator skips to avoid duplicates.
         var sdkIndex = SdkIndex.CreateForTesting(
             connectorNames: new[]
             {
@@ -190,11 +190,11 @@ public sealed class SdkAntiPatternValidatorTests
             .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
             .ConfigureAwait(continueOnCapturedContext: false);
 
-        // Assert
-        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
-            string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorOperationValueUnknown, StringComparison.Ordinal));
-        Assert.IsNotNull(result, message: "Expected CSDK401 when operation belongs to a different connector.");
-        Assert.IsTrue(result.Message.Contains("does not belong to connector", StringComparison.Ordinal));
+        // Assert — CSDK401 should NOT fire when ConnectorName is present (CSDK009 handles it)
+        Assert.IsFalse(
+            diagnostics.Any(diagnostic =>
+                string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorOperationValueUnknown, StringComparison.Ordinal)),
+            message: "Should not emit CSDK401 when ConnectorName is present (AttributeValidator CSDK009 handles this).");
     }
 
     [TestMethod]
