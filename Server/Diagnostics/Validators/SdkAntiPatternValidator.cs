@@ -123,6 +123,23 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
                     // Try connector-scoped validation first when ConnectorName is present.
                     string? connectorName = SdkAntiPatternValidator.GetConnectorNameFromAttribute(attribute);
+
+                    // Resolve constant-style ConnectorName (e.g., "Office365" from
+                    // ConnectorNames.Office365) to the canonical value ("office365")
+                    // using the SDK index's ConnectorNameConstants.
+                    if (connectorName is not null)
+                    {
+                        SdkConstant? matchedConnector = sdkIndex.ConnectorNameConstants
+                            .FirstOrDefault(connector =>
+                                string.Equals(connector.FieldName, connectorName, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(connector.Value, connectorName, StringComparison.OrdinalIgnoreCase));
+
+                        if (matchedConnector is not null)
+                        {
+                            connectorName = matchedConnector.Value;
+                        }
+                    }
+
                     bool found;
                     string message;
 
@@ -259,9 +276,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
             string typeName = catchClause.Declaration.Type.ToString();
 
-            // Extract the simple type name from potentially qualified names
-            int lastDot = typeName.LastIndexOf('.');
-            string simpleTypeName = lastDot >= 0 ? typeName.Substring(lastDot + 1) : typeName;
+            // Extract the simple type name using the shared helper that handles
+            // qualified names (Ns.Type), alias-qualified (global::Type), and
+            // double-colon forms.
+            string simpleTypeName = ValidatorHelpers.ExtractRightmostIdentifier(typeName);
 
             if (!string.Equals(simpleTypeName, "ConnectorException", StringComparison.Ordinal))
             {

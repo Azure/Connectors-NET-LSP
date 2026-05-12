@@ -198,6 +198,42 @@ public sealed class SdkAntiPatternValidatorTests
     }
 
     [TestMethod]
+    public async Task ValidateAsync_ConnectorOperationConstantReference_NoCSdk401Async()
+    {
+        // Arrange: ConnectorName = ConnectorNames.Office365 resolves to FieldName "Office365"
+        // which should be mapped to canonical value "office365" for lookup.
+        var sdkIndex = SdkAntiPatternValidatorTests.CreateMockSdkIndex();
+        var validator = SdkAntiPatternValidatorTests.CreateValidator(sdkIndex);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class ConnectorOperationAttribute : Attribute
+            {
+                public string ConnectorName { get; set; } = "";
+                public string OperationName { get; set; } = "";
+            }
+            public static class ConnectorNames { public const string Office365 = "office365"; }
+            public class Test
+            {
+                [ConnectorOperation(ConnectorName = ConnectorNames.Office365, OperationName = "OnNewEmail")]
+                public void MyMethod() { }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.IsFalse(
+            diagnostics.Any(diagnostic =>
+                string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorOperationValueUnknown, StringComparison.Ordinal)),
+            message: "Should not emit CSDK401 when ConnectorName is a constant reference (FieldName form).");
+    }
+
+    [TestMethod]
     public async Task ValidateAsync_ConnectorOperationPositionalArgument_EmitsCSdk401Async()
     {
         // Arrange
@@ -483,6 +519,42 @@ public sealed class SdkAntiPatternValidatorTests
             diagnostics.Any(diagnostic =>
                 string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorExceptionWithoutStatusCode, StringComparison.Ordinal)),
             message: "Should not emit CSDK403 when StatusCode is checked in catch filter (when clause).");
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_GlobalQualifiedConnectorException_EmitsCSdk403Async()
+    {
+        // Arrange: global::ConnectorException should be recognized
+        var validator = SdkAntiPatternValidatorTests.CreateValidator();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            public class ConnectorException : Exception
+            {
+                public int StatusCode { get; set; }
+            }
+            public class Test
+            {
+                public void Run()
+                {
+                    try { }
+                    catch (global::ConnectorException ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorExceptionWithoutStatusCode, StringComparison.Ordinal));
+        Assert.IsNotNull(result, message: "Expected CSDK403 for global::ConnectorException without StatusCode check.");
     }
 
     // ---------------------------------------------------------------
