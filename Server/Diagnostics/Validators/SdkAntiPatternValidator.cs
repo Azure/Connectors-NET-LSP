@@ -277,8 +277,15 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
             // Check both regular member access (ex.StatusCode) and conditional
             // access (ex?.StatusCode) so that null-safe patterns are recognized.
+            // Also check the catch filter expression (catch ... when (ex.StatusCode == ...)).
             bool referencesStatusCode = SdkAntiPatternValidator.BlockReferencesStatusCode(
                 catchClause.Block, exceptionVariableName);
+
+            if (!referencesStatusCode && catchClause.Filter?.FilterExpression is not null)
+            {
+                referencesStatusCode = SdkAntiPatternValidator.ExpressionReferencesStatusCode(
+                    catchClause.Filter.FilterExpression, exceptionVariableName);
+            }
 
             if (!referencesStatusCode)
             {
@@ -385,6 +392,8 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
             foreach (InvocationExpressionSyntax invocation in bodyNodes.OfType<InvocationExpressionSyntax>())
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 IMethodSymbol? methodSymbol = SdkAntiPatternValidator.ResolveMethodSymbol(
                     invocation, semanticModel, cancellationToken);
 
@@ -538,6 +547,27 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                 string.Equals(conditionalIdentifier.Identifier.Text, exceptionVariableName, StringComparison.Ordinal) &&
                 conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding &&
                 string.Equals(memberBinding.Name.Identifier.Text, "StatusCode", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks whether an expression syntax node references <c>StatusCode</c> on the
+    /// exception variable. Used to scan catch filter expressions
+    /// (<c>catch (ConnectorException ex) when (ex.StatusCode == ...)</c>).
+    /// </summary>
+    private static bool ExpressionReferencesStatusCode(ExpressionSyntax expression, string exceptionVariableName)
+    {
+        foreach (SyntaxNode node in expression.DescendantNodesAndSelf())
+        {
+            if (node is MemberAccessExpressionSyntax memberAccess &&
+                string.Equals(memberAccess.Name.Identifier.Text, "StatusCode", StringComparison.Ordinal) &&
+                memberAccess.Expression is IdentifierNameSyntax identifier &&
+                string.Equals(identifier.Identifier.Text, exceptionVariableName, StringComparison.Ordinal))
             {
                 return true;
             }

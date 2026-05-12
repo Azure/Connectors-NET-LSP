@@ -448,6 +448,43 @@ public sealed class SdkAntiPatternValidatorTests
             message: "Should not emit CSDK403 when StatusCode is accessed via conditional access (ex?.StatusCode).");
     }
 
+    [TestMethod]
+    public async Task ValidateAsync_CatchConnectorExceptionWithFilterStatusCode_NoCSdk403Async()
+    {
+        // Arrange
+        var validator = SdkAntiPatternValidatorTests.CreateValidator();
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = """
+            using System;
+            public class ConnectorException : Exception
+            {
+                public int StatusCode { get; set; }
+            }
+            public class Test
+            {
+                public void Run()
+                {
+                    try { }
+                    catch (ConnectorException ex) when (ex.StatusCode == 429)
+                    {
+                        Console.WriteLine("Throttled.");
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex: null, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.IsFalse(
+            diagnostics.Any(diagnostic =>
+                string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorExceptionWithoutStatusCode, StringComparison.Ordinal)),
+            message: "Should not emit CSDK403 when StatusCode is checked in catch filter (when clause).");
+    }
+
     // ---------------------------------------------------------------
     // CSDK404: Async connector call without await
     // ---------------------------------------------------------------
