@@ -103,9 +103,9 @@ internal static partial class SdkDynamicOperationsDiscovery
         foreach (string assemblyPath in trustedAssemblies)
         {
             string fileName = Path.GetFileName(assemblyPath);
-            if (fileName.StartsWith("System.") ||
-                fileName.StartsWith("mscorlib") ||
-                fileName.StartsWith("netstandard"))
+            if (fileName.StartsWith("System.", StringComparison.Ordinal) ||
+                fileName.StartsWith("mscorlib", StringComparison.Ordinal) ||
+                fileName.StartsWith("netstandard", StringComparison.Ordinal))
             {
                 if (!seenPaths.Contains(assemblyPath))
                 {
@@ -431,9 +431,9 @@ internal static partial class SdkDynamicOperationsDiscovery
             string candidate = match.Groups[1].Value;
 
             // API paths typically start with / and contain common patterns
-            if (candidate.StartsWith("/") &&
-                (candidate.Contains("api") || candidate.Contains("beta") || candidate.Contains("v2") ||
-                 candidate.Contains("datasets") || candidate.Contains("forms") || candidate.Contains("trigger")))
+            if (candidate.StartsWith("/", StringComparison.Ordinal) &&
+                (candidate.Contains("api", StringComparison.Ordinal) || candidate.Contains("beta", StringComparison.Ordinal) || candidate.Contains("v2", StringComparison.Ordinal) ||
+                 candidate.Contains("datasets", StringComparison.Ordinal) || candidate.Contains("forms", StringComparison.Ordinal) || candidate.Contains("trigger", StringComparison.Ordinal)))
             {
                 path = candidate;
                 break;

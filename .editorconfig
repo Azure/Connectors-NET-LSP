@@ -91,11 +91,10 @@ dotnet_diagnostic.SA1214.severity = suggestion
 # StyleCop: disable field access modifier rules
 dotnet_diagnostic.SA1401.severity = suggestion
 
-# Line length guidelines - shows visual vertical line at 120 characters
+# Line length guidelines
 # This is a modern standard for C# (Roslyn, ASP.NET Core, etc.)
 # Provides visual feedback without breaking builds
 [*.cs]
-guidelines = 120
 max_line_length = 120
 
 
@@ -105,6 +104,8 @@ dotnet_diagnostic.SA1010.severity = none
 # String comparison: flag missing StringComparison on string methods (suggestion-only;
 # promote to warning after fixing pre-existing violations — see issue #34)
 # CA1307: Specify StringComparison for clarity
-dotnet_diagnostic.CA1307.severity = suggestion
+dotnet_diagnostic.CA1307.severity = warning
 # CA1310: Specify StringComparison for correctness
-dotnet_diagnostic.CA1310.severity = suggestion
+dotnet_diagnostic.CA1310.severity = warning
+
+

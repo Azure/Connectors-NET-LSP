@@ -21,7 +21,7 @@ namespace SdkLspServer.Handlers.CodeActionHandler;
 /// clicks the Code Action. Does the schema fetch + class generation + writes the file
 /// to disk and updates the source document to use the generated type.
 /// </summary>
-public class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
+internal class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
 {
     /// <summary>
     /// The command identifier used in CodeAction.Command and registered with the LSP server.
