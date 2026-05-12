@@ -551,6 +551,74 @@ public sealed class SdkAntiPatternValidatorTests
             message: "Should not emit CSDK404 for sync methods.");
     }
 
+    [TestMethod]
+    public async Task ValidateAsync_ChainedConfigureAwaitWithoutAwait_EmitsCSdk404Async()
+    {
+        // Arrange: client.SendEmailAsync("test").ConfigureAwait(continueOnCapturedContext: false);
+        // without await should still detect the underlying SDK method.
+        var sdkIndex = SdkAntiPatternValidatorTests.CreateMockSdkIndex();
+        var validator = SdkAntiPatternValidatorTests.CreateValidator(sdkIndex);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = SdkAntiPatternValidatorTests.SdkPreamble + """
+            namespace TestApp
+            {
+                public class MyFunction
+                {
+                    public void Run()
+                    {
+                        var client = new Azure.Connectors.Sdk.Office365.Office365Client();
+                        client.SendEmailAsync("test").ConfigureAwait(continueOnCapturedContext: false);
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
+            string.Equals(diagnostic.Code?.String, DiagnosticCodes.AsyncConnectorCallWithoutAwait, StringComparison.Ordinal));
+        Assert.IsNotNull(result, message: "Expected CSDK404 for chained ConfigureAwait without await.");
+        Assert.IsTrue(result.Message.Contains("SendEmailAsync", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task ValidateAsync_ChainedConfigureAwaitWithAwait_NoCSdk404Async()
+    {
+        // Arrange: await client.SendEmailAsync("test").ConfigureAwait(continueOnCapturedContext: false);
+        // should NOT emit CSDK404.
+        var sdkIndex = SdkAntiPatternValidatorTests.CreateMockSdkIndex();
+        var validator = SdkAntiPatternValidatorTests.CreateValidator(sdkIndex);
+        var uri = DocumentUri.From("file:///test.cs");
+        string code = SdkAntiPatternValidatorTests.SdkPreamble + """
+            namespace TestApp
+            {
+                public class MyFunction
+                {
+                    public async System.Threading.Tasks.Task Run()
+                    {
+                        var client = new Azure.Connectors.Sdk.Office365.Office365Client();
+                        await client.SendEmailAsync("test").ConfigureAwait(continueOnCapturedContext: false);
+                    }
+                }
+            }
+            """;
+
+        // Act
+        IReadOnlyList<Diagnostic> diagnostics = await validator
+            .ValidateAsync(uri, code, sdkIndex, CancellationToken.None)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        // Assert
+        Assert.IsFalse(
+            diagnostics.Any(diagnostic =>
+                string.Equals(diagnostic.Code?.String, DiagnosticCodes.AsyncConnectorCallWithoutAwait, StringComparison.Ordinal)),
+            message: "Should not emit CSDK404 when chained ConfigureAwait is awaited.");
+    }
+
     // ---------------------------------------------------------------
     // CSDK405: CancellationToken not passed
     // ---------------------------------------------------------------

@@ -230,6 +230,10 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                             DiagnosticCodes.WrongPayloadTypeDirection,
                             $"Type '{simpleTypeName}' appears to be an input type but is used to receive an async result. Did you mean '{suggestedType}'?"));
                     }
+
+                    // One diagnostic per declaration is sufficient — the type span
+                    // is shared across all variables in the declaration.
+                    break;
                 }
             }
         }
@@ -314,7 +318,8 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
                 continue;
             }
 
-            // Unwrap chained invocations like client.SendEmailAsync(...).ConfigureAwait(false)
+            // Unwrap chained invocations like
+            // client.SendEmailAsync(...).ConfigureAwait(continueOnCapturedContext: false)
             // to find the underlying connector SDK method call.
             InvocationExpressionSyntax connectorInvocation = SdkAntiPatternValidator.UnwrapChainedInvocation(
                 invocation);
@@ -472,7 +477,7 @@ internal sealed class SdkAntiPatternValidator : IDiagnosticValidator
 
     /// <summary>
     /// Unwraps chained invocations to find the innermost invocation expression.
-    /// For example, <c>client.SendEmailAsync(...).ConfigureAwait(false)</c> resolves
+    /// For example, <c>client.SendEmailAsync(...).ConfigureAwait(continueOnCapturedContext: false)</c> resolves
     /// to the <c>client.SendEmailAsync(...)</c> invocation so the SDK method symbol
     /// can be resolved instead of <c>ConfigureAwait</c>.
     /// </summary>
