@@ -332,6 +332,7 @@ internal static class Program
         services.AddSingleton<IDiagnosticValidator, ConnectionConfigValidator>();
         services.AddSingleton<IDiagnosticValidator, TriggerPayloadValidator>();
         services.AddSingleton<IDiagnosticValidator, DynamicValuesValidator>();
+        services.AddSingleton<IDiagnosticValidator, SdkAntiPatternValidator>();
 
         // Register DiagnosticPublisher (resolved after server is built via ILanguageServerFacade)
         services.AddSingleton<DiagnosticPublisher>(provider =>

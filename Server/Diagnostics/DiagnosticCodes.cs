@@ -104,4 +104,25 @@ internal static class DiagnosticCodes
 
     /// <summary>Info-level diagnostic when a C# file contains no reference to the SDK namespace.</summary>
     public const string NoSdkUsageDetected = "CSDK400";
+
+    /// <summary><c>[ConnectorOperation]</c> attribute value doesn't match any known operation in the SDK index.</summary>
+    public const string ConnectorOperationValueUnknown = "CSDK401";
+
+    /// <summary>Input type used where output type is expected.</summary>
+    public const string WrongPayloadTypeDirection = "CSDK402";
+
+    /// <summary>Catching <c>ConnectorException</c> without checking <c>StatusCode</c> property.</summary>
+    public const string ConnectorExceptionWithoutStatusCode = "CSDK403";
+
+    /// <summary>Async connector method called without <c>await</c> keyword.</summary>
+    public const string AsyncConnectorCallWithoutAwait = "CSDK404";
+
+    /// <summary><c>CancellationToken</c> available in scope but not passed to connector API call.</summary>
+    public const string CancellationTokenNotPassed = "CSDK405";
+
+    /// <summary>Connector response property accessed without null check.</summary>
+    public const string ResponseWithoutNullCheck = "CSDK406";
+
+    /// <summary>Binary content operation result not disposed with <c>using</c> statement.</summary>
+    public const string BinaryContentWithoutUsing = "CSDK407";
 }
