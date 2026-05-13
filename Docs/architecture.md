@@ -14,7 +14,7 @@ The extension is the entry point. On activation it:
 2. **Resolves the SDK path** — a 4-step fallback chain (see [SDK Discovery Chain](#adr-4-sdk-discovery-chain) below).
 3. **Resolves the server DLL** — checks explicit setting → sibling debug build → bundled `server/` directory.
 4. **Builds `initializationOptions`** — merges API config, connections (from `connections.json` and `local.settings.json`), CodeLens config, and telemetry config into a single JSON payload.
-5. **Starts the LSP server** via `dotnet <server.dll> --sdk <path>` over stdio transport.
+5. **Starts the LSP server** via `dotnet <server.dll>` over stdio transport, passing `--sdk-assembly <dll>...` when SDK resolution returns DLL paths (from explicit `.dll` setting or `project.assets.json`), or `--sdk <nupkg>` when resolution returns a `.nupkg` file.
 6. **Sets up file watchers** — watches `connections.json` and `local.settings.json` for changes; sends merged updates to the server via the `custom/updateConnections` notification.
 7. **Starts a token refresh loop** — periodically acquires Azure tokens and pushes them to the server via `custom/updateApiConfig`.
 8. **Registers commands** — `restartLanguageServer`, `openConnectionView`, `sdklsp.applyEdits` (for click-to-insert links in hover tooltips).
@@ -78,7 +78,7 @@ textDocument/publishDiagnostics → VS Code
 | `DynamicValuesValidator` | `[DynamicValues]` parameter values against live API data |
 | `SdkAntiPatternValidator` | Common anti-patterns in SDK usage |
 
-See [`.github/copilot-instructions.md`](.github/copilot-instructions.md#architecture-diagnostic-validators) for validator authoring guidelines, including the analysis strategy and key implementation details.
+See [`.github/copilot-instructions.md`](../.github/copilot-instructions.md#architecture-diagnostic-validators) for validator authoring guidelines, including the analysis strategy and key implementation details.
 
 #### State Management (`Store/`)
 
@@ -104,7 +104,7 @@ sequenceDiagram
     VSCode->>VSCode: Resolve SDK path (settings → assets → SDK/ → sibling repo)
     VSCode->>VSCode: Resolve server DLL path
     VSCode->>VSCode: Build initializationOptions (API config, connections, telemetry)
-    VSCode->>Server: Start process: dotnet SdkLspServer.dll --sdk <path>
+    VSCode->>Server: Start process: dotnet SdkLspServer.dll --sdk-assembly <dll>... or --sdk <nupkg>
     Server->>Index: SdkIndex.TryCreateAsync(nupkgPath) or TryCreateFromAssembliesAsync(dllPaths)
     Index-->>Server: SdkIndex (assemblies, types, connectorNames, triggerOperations)
     Server->>Server: Register DI services, handlers, validators
@@ -221,10 +221,10 @@ sequenceDiagram
 
 The LSP server uses two levels of code analysis depending on the latency budget:
 
-- **Syntax-only analysis** — Used by diagnostic validators and fast-path handlers. Parses the document with `CSharpSyntaxTree.ParseText()` and walks the syntax tree without building a full compilation. This avoids the cost of reference resolution and provides sub-100ms response times.
-- **Semantic model analysis** — Used by Hover, Completion, and CodeLens handlers when they need type resolution, symbol lookup, or attribute inspection. Goes through `CompilationService.GetCompilation()` to get a full Roslyn `SemanticModel` with SDK and NuGet references.
+- **Syntax-only analysis** — Used by most diagnostic validators and fast-path handlers. Parses the document with `CSharpSyntaxTree.ParseText()` and walks the syntax tree without building a full compilation. This avoids the cost of reference resolution and provides sub-100ms response times.
+- **Semantic model analysis** — Used by Hover, Completion, and CodeLens handlers when they need type resolution, symbol lookup, or attribute inspection. Goes through `CompilationService.GetCompilation()` to get a full Roslyn `SemanticModel` with SDK and NuGet references. Some diagnostic validators also use semantic analysis for checks that cannot be done syntactically — notably `DynamicValuesValidator` (resolves `[DynamicValues]` attribute arguments to their declared operations) and `SdkAntiPatternValidator` (inspects method symbols and return types).
 
-For detailed validator authoring guidelines covering this strategy, see the [Architecture: Diagnostic Validators](.github/copilot-instructions.md#architecture-diagnostic-validators) section in `.github/copilot-instructions.md`.
+For detailed validator authoring guidelines covering this strategy, see the [Architecture: Diagnostic Validators](../.github/copilot-instructions.md#architecture-diagnostic-validators) section in `.github/copilot-instructions.md`.
 
 ## Key Design Decisions
 
