@@ -73,7 +73,7 @@ public sealed class SdkIndex
 
             // For nested types (e.g., "Namespace.Outer+Inner"), also add the dotted
             // variant ("Namespace.Outer.Inner") since C# source code uses '.' not '+'.
-            if (fullTypeName.Contains('+'))
+            if (fullTypeName.Contains('+', StringComparison.Ordinal))
             {
                 lookup.Add(fullTypeName.Replace('+', '.'));
             }
@@ -441,15 +441,15 @@ public sealed class SdkIndex
                             }
                         }
                     }
-                    catch (Exception e)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
-                        result.Failures.Add((asmPath, e.Message));
+                        result.Failures.Add((asmPath, ex.Message));
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception ex) when (!ex.IsFatal())
             {
-                result.Failures.Add(("(resolver)", e.Message));
+                result.Failures.Add(("(resolver)", ex.Message));
             }
 
             return result;

@@ -23,13 +23,13 @@ public class SourceCodeUpdateTests
 
         // Assert
         Assert.IsTrue(
-            result.Contains("new PostMessageInput()"),
+            result.Contains("new PostMessageInput()", StringComparison.Ordinal),
             message: "Should replace the fully-qualified new expression.");
         Assert.IsFalse(
-            result.Contains("DynamicPostMessageRequest"),
+            result.Contains("DynamicPostMessageRequest", StringComparison.Ordinal),
             message: "Original type name should be gone.");
         Assert.IsTrue(
-            result.Contains("AdditionalProperties"),
+            result.Contains("AdditionalProperties", StringComparison.Ordinal),
             message: "AdditionalProperties access should remain unchanged.");
     }
 
@@ -50,7 +50,7 @@ public class SourceCodeUpdateTests
 
         // Assert
         Assert.IsTrue(
-            result.Contains("new PostMessageInput()"),
+            result.Contains("new PostMessageInput()", StringComparison.Ordinal),
             message: "Should replace short-form new expression.");
     }
 
@@ -114,10 +114,10 @@ public class SourceCodeUpdateTests
 
         // Assert — only `new DynamicPostMessageRequest()` should be replaced
         Assert.IsTrue(
-            result.Contains("new PostMessageInput()"),
+            result.Contains("new PostMessageInput()", StringComparison.Ordinal),
             message: "new expression should be replaced.");
         Assert.IsTrue(
-            result.Contains("DynamicPostMessageRequest existingParam"),
+            result.Contains("DynamicPostMessageRequest existingParam", StringComparison.Ordinal),
             message: "Parameter type should remain unchanged — it's the base type, still valid.");
     }
 }

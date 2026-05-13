@@ -37,13 +37,13 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "MyApp.Models");
 
         // Assert
-        Assert.IsTrue(result.Contains("public class PostMessageInput : DynamicPostMessageRequest"), message: "Should inherit from base class.");
-        Assert.IsTrue(result.Contains("[JsonPropertyName(\"messageBody\")]"), message: "Should have JsonPropertyName for messageBody.");
-        Assert.IsTrue(result.Contains("[JsonPropertyName(\"subject\")]"), message: "Should have JsonPropertyName for subject.");
-        Assert.IsTrue(result.Contains("public string? MessageBody { get; set; }"), message: "Should have PascalCase property.");
-        Assert.IsTrue(result.Contains("public string? Subject { get; set; }"), message: "Should have PascalCase property.");
-        Assert.IsTrue(result.Contains("namespace MyApp.Models;"), message: "Should have target namespace.");
-        Assert.IsTrue(result.Contains("using Azure.Connectors.Sdk.Teams;"), message: "Should import base class namespace.");
+        Assert.IsTrue(result.Contains("public class PostMessageInput : DynamicPostMessageRequest", StringComparison.Ordinal), message: "Should inherit from base class.");
+        Assert.IsTrue(result.Contains("[JsonPropertyName(\"messageBody\")]", StringComparison.Ordinal), message: "Should have JsonPropertyName for messageBody.");
+        Assert.IsTrue(result.Contains("[JsonPropertyName(\"subject\")]", StringComparison.Ordinal), message: "Should have JsonPropertyName for subject.");
+        Assert.IsTrue(result.Contains("public string? MessageBody { get; set; }", StringComparison.Ordinal), message: "Should have PascalCase property.");
+        Assert.IsTrue(result.Contains("public string? Subject { get; set; }", StringComparison.Ordinal), message: "Should have PascalCase property.");
+        Assert.IsTrue(result.Contains("namespace MyApp.Models;", StringComparison.Ordinal), message: "Should have target namespace.");
+        Assert.IsTrue(result.Contains("using Azure.Connectors.Sdk.Teams;", StringComparison.Ordinal), message: "Should import base class namespace.");
     }
 
     [TestMethod]
@@ -69,7 +69,7 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "MyApp.Models");
 
         // Assert
-        Assert.IsFalse(result.Contains("using MyApp.Models;"), message: "Should not import own namespace.");
+        Assert.IsFalse(result.Contains("using MyApp.Models;", StringComparison.Ordinal), message: "Should not import own namespace.");
     }
 
     [TestMethod]
@@ -97,9 +97,9 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public int? RetryCount { get; set; }"), message: "integer should map to int?.");
-        Assert.IsTrue(result.Contains("public bool? IsEnabled { get; set; }"), message: "boolean should map to bool?.");
-        Assert.IsTrue(result.Contains("public double? Threshold { get; set; }"), message: "number should map to double?.");
+        Assert.IsTrue(result.Contains("public int? RetryCount { get; set; }", StringComparison.Ordinal), message: "integer should map to int?.");
+        Assert.IsTrue(result.Contains("public bool? IsEnabled { get; set; }", StringComparison.Ordinal), message: "boolean should map to bool?.");
+        Assert.IsTrue(result.Contains("public double? Threshold { get; set; }", StringComparison.Ordinal), message: "number should map to double?.");
     }
 
     [TestMethod]
@@ -132,10 +132,10 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public Recipient? Recipient { get; set; }"), message: "Nested object should be a typed reference.");
-        Assert.IsTrue(result.Contains("public class Recipient"), message: "Nested class should be generated.");
-        Assert.IsTrue(result.Contains("[JsonPropertyName(\"groupId\")]"), message: "Nested properties should have JsonPropertyName.");
-        Assert.IsTrue(result.Contains("public string? GroupId { get; set; }"), message: "Nested properties should be PascalCase.");
+        Assert.IsTrue(result.Contains("public Recipient? Recipient { get; set; }", StringComparison.Ordinal), message: "Nested object should be a typed reference.");
+        Assert.IsTrue(result.Contains("public class Recipient", StringComparison.Ordinal), message: "Nested class should be generated.");
+        Assert.IsTrue(result.Contains("[JsonPropertyName(\"groupId\")]", StringComparison.Ordinal), message: "Nested properties should have JsonPropertyName.");
+        Assert.IsTrue(result.Contains("public string? GroupId { get; set; }", StringComparison.Ordinal), message: "Nested properties should be PascalCase.");
     }
 
     [TestMethod]
@@ -164,7 +164,7 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public List<string>? Tags { get; set; }"), message: "Array of strings should map to List<string>?.");
+        Assert.IsTrue(result.Contains("public List<string>? Tags { get; set; }", StringComparison.Ordinal), message: "Array of strings should map to List<string>?.");
     }
 
     [TestMethod]
@@ -192,7 +192,7 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public JsonElement? Metadata { get; set; }"), message: "Object without properties should map to JsonElement?.");
+        Assert.IsTrue(result.Contains("public JsonElement? Metadata { get; set; }", StringComparison.Ordinal), message: "Object without properties should map to JsonElement?.");
     }
 
     [TestMethod]
@@ -221,7 +221,7 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public DateTimeOffset? CreatedAt { get; set; }"), message: "date-time format should map to DateTimeOffset?.");
+        Assert.IsTrue(result.Contains("public DateTimeOffset? CreatedAt { get; set; }", StringComparison.Ordinal), message: "date-time format should map to DateTimeOffset?.");
     }
 
     [TestMethod]
@@ -251,8 +251,8 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("/// A test object."), message: "Class-level description should be in XML doc.");
-        Assert.IsTrue(result.Contains("/// The display name."), message: "Property-level description should be in XML doc.");
+        Assert.IsTrue(result.Contains("/// A test object.", StringComparison.Ordinal), message: "Class-level description should be in XML doc.");
+        Assert.IsTrue(result.Contains("/// The display name.", StringComparison.Ordinal), message: "Property-level description should be in XML doc.");
     }
 
     [TestMethod]
@@ -276,9 +276,9 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public class EmptyInput : DynamicEmptyRequest"), message: "Should still generate the class.");
-        Assert.IsTrue(result.Contains("{"), message: "Should have opening brace.");
-        Assert.IsTrue(result.Contains("}"), message: "Should have closing brace.");
+        Assert.IsTrue(result.Contains("public class EmptyInput : DynamicEmptyRequest", StringComparison.Ordinal), message: "Should still generate the class.");
+        Assert.IsTrue(result.Contains("{", StringComparison.Ordinal), message: "Should have opening brace.");
+        Assert.IsTrue(result.Contains("}", StringComparison.Ordinal), message: "Should have closing brace.");
     }
 
     [TestMethod]
@@ -307,7 +307,7 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("/// Current status of the item."), message: "x-ms-summary should be used as description.");
+        Assert.IsTrue(result.Contains("/// Current status of the item.", StringComparison.Ordinal), message: "x-ms-summary should be used as description.");
     }
 
     [TestMethod]
@@ -366,8 +366,8 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("&lt;b&gt;"), message: "Angle brackets should be XML-escaped.");
-        Assert.IsTrue(result.Contains("&amp;"), message: "Ampersand should be XML-escaped.");
+        Assert.IsTrue(result.Contains("&lt;b&gt;", StringComparison.Ordinal), message: "Angle brackets should be XML-escaped.");
+        Assert.IsTrue(result.Contains("&amp;", StringComparison.Ordinal), message: "Ampersand should be XML-escaped.");
     }
 
     [TestMethod]
@@ -402,10 +402,10 @@ public class SchemaToClassGeneratorTests
             targetNamespace: "App");
 
         // Assert
-        Assert.IsTrue(result.Contains("public List<AttachmentsItem>? Attachments { get; set; }"), message: "Array of objects should reference the generated item class.");
-        Assert.IsTrue(result.Contains("public class AttachmentsItem"), message: "Item class should be generated.");
-        Assert.IsTrue(result.Contains("public string? Name { get; set; }"), message: "Item class should have string property.");
-        Assert.IsTrue(result.Contains("public int? Size { get; set; }"), message: "Item class should have int property.");
+        Assert.IsTrue(result.Contains("public List<AttachmentsItem>? Attachments { get; set; }", StringComparison.Ordinal), message: "Array of objects should reference the generated item class.");
+        Assert.IsTrue(result.Contains("public class AttachmentsItem", StringComparison.Ordinal), message: "Item class should be generated.");
+        Assert.IsTrue(result.Contains("public string? Name { get; set; }", StringComparison.Ordinal), message: "Item class should have string property.");
+        Assert.IsTrue(result.Contains("public int? Size { get; set; }", StringComparison.Ordinal), message: "Item class should have int property.");
     }
 
     [TestMethod]

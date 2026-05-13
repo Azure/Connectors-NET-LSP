@@ -19,7 +19,7 @@ using SdkLspServer.Store.DynamicData;
 
 namespace SdkLspServer.Handlers.HoverHandler;
 
-public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService, Services.CompilationService compilationService) : HoverHandlerBase
+internal class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService, Services.CompilationService compilationService) : HoverHandlerBase
 {
     private static readonly SymbolDisplayFormat ShortTypeFormat = new(
         globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
@@ -175,11 +175,11 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
         try
         {
             string paramTag = $"<param name=\"{paramName}\">";
-            int paramStart = xml.IndexOf(paramTag);
+            int paramStart = xml.IndexOf(paramTag, StringComparison.Ordinal);
             if (paramStart >= 0)
             {
                 int contentStart = paramStart + paramTag.Length;
-                int paramEnd = xml.IndexOf("</param>", contentStart);
+                int paramEnd = xml.IndexOf("</param>", contentStart, StringComparison.Ordinal);
                 if (paramEnd > contentStart)
                 {
                     return xml[contentStart..paramEnd].Trim();
@@ -298,7 +298,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
             // Strip quotes if the value has them (e.g., "value" -> value)
             string cleanValue = valueToInsert.Trim();
-            if (cleanValue.StartsWith("\"") && cleanValue.EndsWith("\""))
+            if (cleanValue.StartsWith("\"", StringComparison.Ordinal) && cleanValue.EndsWith("\"", StringComparison.Ordinal))
             {
                 cleanValue = cleanValue[1..^1];
             }
@@ -351,7 +351,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 startChar = lineSpan.StartLinePosition.Character;
                 endLine = lineSpan.EndLinePosition.Line;
                 endChar = lineSpan.EndLinePosition.Character;
-                var escapedValue = cleanValue.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                var escapedValue = cleanValue.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
                 baseNewText = $"\"{escapedValue}\"";
 
                 Console.Error.WriteLine($"[CreateInsertValueCommandUri] Expression at Line {startLine}, Char {startChar}-{endChar}");
@@ -932,7 +932,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
             parts.Add("**Connector SDK**");
 
             // Add usage example for SDK methods
-            if (symbol is IMethodSymbol method && method.Name.Contains("Add"))
+            if (symbol is IMethodSymbol method && method.Name.Contains("Add", StringComparison.Ordinal))
             {
                 string example = GenerateMethodExample(method);
                 if (!string.IsNullOrEmpty(example))
@@ -948,7 +948,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
     {
         if (method.Parameters.Length > 0)
         {
-            string instanceName = method.ContainingType?.Name.ToLower().Replace("builder", string.Empty) ?? "agent";
+            string instanceName = method.ContainingType?.Name.ToLower().Replace("builder", string.Empty, StringComparison.Ordinal) ?? "agent";
             return $"{instanceName}.{method.Name}({string.Join(", ", method.Parameters.Select(GenerateParameterExample))});";
         }
 
@@ -976,12 +976,12 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
 
         try
         {
-            int summaryStart = xml.IndexOf("<summary>");
-            int summaryEnd = xml.IndexOf("</summary>");
+            int summaryStart = xml.IndexOf("<summary>", StringComparison.Ordinal);
+            int summaryEnd = xml.IndexOf("</summary>", StringComparison.Ordinal);
             if (summaryStart >= 0 && summaryEnd > summaryStart)
             {
                 string summary = xml.Substring(summaryStart + 9, summaryEnd - summaryStart - 9);
-                return summary.Trim().Replace("\n", " ").Replace("  ", " ");
+                return summary.Trim().Replace("\n", " ", StringComparison.Ordinal).Replace("  ", " ", StringComparison.Ordinal);
             }
         }
         catch
@@ -1452,7 +1452,7 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
                 result.AppendLine("**Attributes:**");
                 foreach (AttributeData? attr in attributes)
                 {
-                    string attrName = attr.AttributeClass?.Name.Replace("Attribute", string.Empty) ?? "Unknown";
+                    string attrName = attr.AttributeClass?.Name.Replace("Attribute", string.Empty, StringComparison.Ordinal) ?? "Unknown";
                     result.AppendLine($"- `[{attrName}]`");
                 }
 
@@ -1725,15 +1725,15 @@ public class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Conne
         string lower = parameterName.ToLowerInvariant();
 
         // Common patterns for Microsoft Forms
-        if (lower.Contains("formid") || lower.Contains("form_id"))
+        if (lower.Contains("formid", StringComparison.Ordinal) || lower.Contains("form_id", StringComparison.Ordinal))
         {
             return "ListForms";
         }
 
         // Common patterns for Teams
-        return lower.Contains("teamid") || lower.Contains("team_id")
+        return lower.Contains("teamid", StringComparison.Ordinal) || lower.Contains("team_id", StringComparison.Ordinal)
             ? "GetAllTeams"
-            : lower.Contains("channelid") || lower.Contains("channel_id") ? "GetChannelsForGroup" : null;
+            : lower.Contains("channelid", StringComparison.Ordinal) || lower.Contains("channel_id", StringComparison.Ordinal) ? "GetChannelsForGroup" : null;
     }
 
     private static IMethodSymbol? TryResolveMethodSymbol(InvocationExpressionSyntax invocation, SemanticModel semanticModel, SymbolInfo initialSymbolInfo)

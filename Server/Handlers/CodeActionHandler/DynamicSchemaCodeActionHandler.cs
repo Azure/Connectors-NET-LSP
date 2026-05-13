@@ -19,7 +19,7 @@ namespace SdkLspServer.Handlers.CodeActionHandler;
 /// Detection is fast (syntax + cached SRM metadata). No schema fetch or code generation
 /// happens here — that's deferred to GenerateDynamicSchemaCommandHandler when the user clicks.
 /// </summary>
-public class DynamicSchemaCodeActionHandler(
+internal class DynamicSchemaCodeActionHandler(
     SdkIndex? sdkIndex,
     BufferManager bufferManager,
     ITelemetryService telemetryService) : CodeActionHandlerBase
@@ -238,7 +238,7 @@ public class DynamicSchemaCodeActionHandler(
 
         // Infer connector from namespace: "Azure.Connectors.Sdk.Teams" → "teams"
         string? connectorName = null;
-        string typeNamespace = matchingFullName.Contains('.')
+        string typeNamespace = matchingFullName.Contains('.', StringComparison.Ordinal)
             ? matchingFullName[..matchingFullName.LastIndexOf('.')]
             : string.Empty;
 

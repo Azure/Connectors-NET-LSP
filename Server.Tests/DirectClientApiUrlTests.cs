@@ -30,8 +30,8 @@ public class DirectClientApiUrlTests
 
         string actual = $"{runtimeUrl.TrimEnd('/')}{operationPath}";
 
-        Assert.IsTrue(actual.Contains("/abc123/datasets"), $"URL should not have double slashes: {actual}");
-        Assert.IsFalse(actual.Contains("//datasets"), $"URL has double slashes: {actual}");
+        Assert.IsTrue(actual.Contains("/abc123/datasets", StringComparison.Ordinal), $"URL should not have double slashes: {actual}");
+        Assert.IsFalse(actual.Contains("//datasets", StringComparison.Ordinal), $"URL has double slashes: {actual}");
     }
 
     [TestMethod]
@@ -44,9 +44,9 @@ public class DirectClientApiUrlTests
 
         string url = $"{baseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={ApiVersion}";
 
-        Assert.IsTrue(url.Contains("subscriptions/sub-123"));
-        Assert.IsTrue(url.Contains("resourceGroups/rg-test"));
-        Assert.IsTrue(url.Contains("connections/abc123"));
+        Assert.IsTrue(url.Contains("subscriptions/sub-123", StringComparison.Ordinal));
+        Assert.IsTrue(url.Contains("resourceGroups/rg-test", StringComparison.Ordinal));
+        Assert.IsTrue(url.Contains("connections/abc123", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -61,6 +61,6 @@ public class DirectClientApiUrlTests
         string url = $"{baseUrl}/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.Web/connections/{armConnectionName}/dynamicInvoke?api-version={ApiVersion}";
 
         // URL has empty segments — this would fail with Azure
-        Assert.IsTrue(url.Contains("subscriptions//resourceGroups//"), "ARM URL has empty segments when config is missing");
+        Assert.IsTrue(url.Contains("subscriptions//resourceGroups//", StringComparison.Ordinal), "ARM URL has empty segments when config is missing");
     }
 }

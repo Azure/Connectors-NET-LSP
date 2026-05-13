@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SdkLspServer.Store.DynamicData;
 
 /// <summary>

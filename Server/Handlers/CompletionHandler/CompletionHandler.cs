@@ -23,7 +23,7 @@ namespace SdkLspServer.Handlers.CompletionHandler;
 /// (e.g., Msnweather) based on the SDK assemblies loaded via <see cref="SdkIndex"/>.
 /// Can also make dynamic API calls to fetch additional completion suggestions.
 /// </summary>
-public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService, Services.CompilationService compilationService) : CompletionHandlerBase
+internal class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, ConnectionsService connectionsService, ApiService apiService, LSPStore lspStore, ITelemetryService telemetryService, Services.CompilationService compilationService) : CompletionHandlerBase
 {
     private readonly SdkIndex? sdkIndex = sdkIndex;
     private readonly BufferManager bufferManager = bufferManager;
@@ -267,7 +267,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
                 foreach (IMethodSymbol m in opMethods.Count > 0 ? opMethods : methods)
                 {
                     // Skip common noise
-                    if (m.Name.StartsWith("get_") || m.Name.StartsWith("set_") || m.Name.StartsWith("add_") || m.Name.StartsWith("remove_"))
+                    if (m.Name.StartsWith("get_", StringComparison.Ordinal) || m.Name.StartsWith("set_", StringComparison.Ordinal) || m.Name.StartsWith("add_", StringComparison.Ordinal) || m.Name.StartsWith("remove_", StringComparison.Ordinal))
                     {
                         continue;
                     }
@@ -423,7 +423,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
     /// </summary>
     private static List<CompletionItem> BuildFilteredPayloadCompletionItems(string fullTypeName)
     {
-        string shortName = fullTypeName.Contains('.')
+        string shortName = fullTypeName.Contains('.', StringComparison.Ordinal)
             ? fullTypeName.Substring(fullTypeName.LastIndexOf('.') + 1)
             : fullTypeName;
 
@@ -640,7 +640,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
         for (int scanLine = lineNum - 1; scanLine >= Math.Max(0, lineNum - 5); scanLine--)
         {
             contextWindow = sourceText.Lines[scanLine].ToString() + "\n" + contextWindow;
-            if (contextWindow.Contains('['))
+            if (contextWindow.Contains('[', StringComparison.Ordinal))
             {
                 break;
             }
@@ -1086,7 +1086,7 @@ public class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager, 
         var items = new List<CompletionItem>();
         foreach (string fullTypeName in triggerPayloadTypes)
         {
-            string shortName = fullTypeName.Contains('.')
+            string shortName = fullTypeName.Contains('.', StringComparison.Ordinal)
                 ? fullTypeName.Substring(fullTypeName.LastIndexOf('.') + 1)
                 : fullTypeName;
 

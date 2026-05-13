@@ -21,7 +21,7 @@ namespace SdkLspServer.Handlers;
 /// for SDK methods and types. CodeLens items appear as clickable text above methods
 /// and provide quick actions like documentation links and usage examples.
 /// </summary>
-public class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, CodeLensConfig codeLensConfig, ITelemetryService telemetryService, Services.CompilationService compilationService) : CodeLensHandlerBase
+internal class CodeLensHandler(SdkIndex? sdkIndex, BufferManager bufferManager, CodeLensConfig codeLensConfig, ITelemetryService telemetryService, Services.CompilationService compilationService) : CodeLensHandlerBase
 {
     private readonly SdkIndex? sdkIndex = sdkIndex;
     private readonly BufferManager bufferManager = bufferManager;
