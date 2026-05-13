@@ -53,7 +53,7 @@ The extension is the entry point. On activation it:
 
 #### Diagnostics Pipeline
 
-```
+```text
 TextDocumentSyncHandler
   │  (on didOpen / didChange / didSave)
   ▼
@@ -235,6 +235,7 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 **Decision:** Use Roslyn `MetadataReference.CreateFromFile()` to load SDK assemblies as metadata references for compilation, rather than `Assembly.Load()` or `Assembly.LoadFrom()`.
 
 **Rationale:**
+
 - Avoids dependency loading issues — `Assembly.Load` pulls in transitive dependencies that may conflict with the server's own dependencies
 - No code execution risk — metadata references are read-only views of the assembly's type system
 - Compatible with Roslyn's `CSharpCompilation` — the same references are used for semantic analysis
@@ -247,6 +248,7 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 **Decision:** A single `CompilationService` instance caches one compilation per document URI. The cache key is `(textLength, contentChecksum, projectDirectory)` — a new compilation is created only when the document text changes or a different project context is detected.
 
 **Rationale:**
+
 - Avoids redundant compilation creation across handlers processing the same document version
 - The `ConcurrentDictionary` cache retains only the latest version per URI to bound memory
 - When the caller passes a different `SyntaxTree` instance with identical text, the service replaces the tree in the cached compilation via `ReplaceSyntaxTree` (cheap operation) rather than rebuilding from scratch
@@ -258,6 +260,7 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 **Decision:** Diagnostic validators primarily use syntax-tree walking. Semantic model usage is reserved for specific checks that cannot be done syntactically (e.g., resolving `[DynamicValues]` attribute arguments to their declared operations).
 
 **Rationale:**
+
 - Syntax parsing is ~1ms for typical files vs ~50-100ms for full compilation
 - Most SDK diagnostics (attribute presence, connector name validation, anti-pattern detection) can be checked syntactically by matching attribute names and string literal arguments against `SdkIndex`
 - Validators that do need semantic analysis (e.g., `DynamicValuesValidator`) accept the cost for higher-value diagnostics
@@ -274,6 +277,7 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 4. **Sibling repo build output** — Look for a `.nupkg` in `../../Connectors-NET-SDK/src/.../bin/Debug` (development scenario when the SDK repo is checked out alongside)
 
 **Rationale:**
+
 - Step 1 provides an explicit override for non-standard setups
 - Step 2 is zero-configuration for normal projects — if the user has run `dotnet restore`, the SDK DLLs are already available
 - Step 3 supports manual SDK staging for evaluation or E2E testing
