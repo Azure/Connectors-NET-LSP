@@ -13,7 +13,7 @@ The extension is the entry point. On activation it:
 1. **Scans for SDK references** — reads `.csproj` files to check for `PackageReference` to the Connector SDK. If no reference is found and no explicit `lspServerPath` is configured, the extension stays inactive.
 2. **Resolves the SDK path** — a 4-step fallback chain (see [SDK Discovery Chain](#adr-4-sdk-discovery-chain) below).
 3. **Resolves the server DLL** — checks explicit setting → sibling debug build → bundled `server/` directory.
-4. **Builds `initializationOptions`** — merges API config, connections (from `connections.json` and `local.settings.json`), CodeLens config, and telemetry config into a single JSON payload.
+4. **Builds `initializationOptions`** — merges API config (Azure subscription, resource group, bearer token) and connections (from `connections.json` and `local.settings.json`) into a JSON payload. (The server also accepts CodeLens and telemetry config in `initializationOptions`, but the VS Code extension does not currently send those.)
 5. **Starts the LSP server** via `dotnet <server.dll>` over stdio transport, passing `--sdk-assembly <dll>...` when SDK resolution returns DLL paths (from explicit `.dll` setting or `project.assets.json`), or `--sdk <nupkg>` when resolution returns a `.nupkg` file.
 6. **Sets up file watchers** — watches `connections.json` and `local.settings.json` for changes; sends merged updates to the server via the `custom/updateConnections` notification.
 7. **Starts a token refresh loop** — periodically acquires Azure tokens and pushes them to the server via `custom/updateApiConfig`.
@@ -109,8 +109,9 @@ sequenceDiagram
     Index-->>Server: SdkIndex (assemblies, types, connectorNames, triggerOperations)
     Server->>Server: Register DI services, handlers, validators
     VSCode->>Server: initialize (with initializationOptions)
-    Server->>Server: Parse apiConfig, connections, codeLens, telemetry from initializationOptions
-    Server-->>VSCode: initialized (capabilities)
+    Server->>Server: Parse apiConfig, connections from initializationOptions
+    Server-->>VSCode: initialize response (capabilities)
+    VSCode->>Server: initialized notification
     VSCode->>VSCode: Setup file watchers (connections.json, local.settings.json)
     VSCode->>VSCode: Start token refresh loop
 ```
