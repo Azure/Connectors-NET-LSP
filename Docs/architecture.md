@@ -34,7 +34,7 @@ The extension is the entry point. On activation it:
 
 | Handler | Protocol Method | What It Does |
 |---------|----------------|--------------|
-| `TextDocumentSyncHandler` | `didOpen`, `didChange`, `didSave`, `didClose` | Updates `BufferManager`, invalidates `CompilationService` cache, schedules debounced diagnostics via `DiagnosticPublisher`, requests CodeLens refresh when SDK usage is detected. |
+| `TextDocumentSyncHandler` | `didOpen`, `didChange`, `didSave`, `didClose` | Updates `BufferManager`, schedules debounced diagnostics via `DiagnosticPublisher`, requests CodeLens refresh when SDK usage is detected. (`CompilationService` cache is replaced lazily when `GetCompilation` detects a changed text length/checksum — there is no explicit invalidation call.) |
 | `HoverHandler` | `textDocument/hover` | Parses the document, gets a `SemanticModel` from `CompilationService`, resolves the symbol at the cursor position, and returns rich Markdown hover content. For `[DynamicValues]` parameters, calls `DynamicOperationsRegistry` → `ApiService` to fetch live values from the connector API. |
 | `CompletionHandler` | `textDocument/completion` | Detects attribute argument contexts (connector names, operation IDs, trigger operations) and returns completion items from `SdkIndex`. For dynamic value parameters, fetches suggestions via `ApiService`. |
 | `CodeLensHandler` | `textDocument/codeLens` | Scans method signatures for SDK return types and attributes, and renders inline metadata (connector name, operation, HTTP method) above method declarations. Command names are configurable via `CodeLensConfig`. |
@@ -208,7 +208,11 @@ sequenceDiagram
         Disc-->>Reg: Dictionary<key, DynamicOperationMetadata>
     end
     Reg-->>HH: DynamicOperationMetadata (API path, HTTP method)
-    HH->>API: GET /api/connectors/{connector}/{operation}
+    alt DirectClient connection
+        HH->>API: Call runtime URL using discovered operation path/method
+    else Managed API connection
+        HH->>API: POST ARM /dynamicInvoke endpoint
+    end
     API->>Cache: Check cache (5min TTL, 1hr fail-safe)
     alt Cache miss
         API->>API: HTTP call with bearer token
@@ -262,8 +266,8 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 **Rationale:**
 
 - Syntax parsing is ~1ms for typical files vs ~50-100ms for full compilation
-- Most SDK diagnostics (attribute presence, connector name validation, anti-pattern detection) can be checked syntactically by matching attribute names and string literal arguments against `SdkIndex`
-- Validators that do need semantic analysis (e.g., `DynamicValuesValidator`) accept the cost for higher-value diagnostics
+- Most SDK diagnostics (attribute presence, connector name validation) can be checked syntactically by matching attribute names and string literal arguments against `SdkIndex`
+- Validators that need semantic analysis (e.g., `DynamicValuesValidator` for attribute argument resolution, `SdkAntiPatternValidator` for async/await and cancellation-token checks) accept the cost for higher-value diagnostics
 
 ### ADR 4: SDK Discovery Chain
 
