@@ -17,7 +17,7 @@ The extension is the entry point. On activation it:
 5. **Starts the LSP server** via `dotnet <server.dll>` over stdio transport, passing `--sdk-assembly <dll>...` when SDK resolution returns DLL paths (from explicit `.dll` setting or `project.assets.json`), or `--sdk <nupkg>` when resolution returns a `.nupkg` file.
 6. **Sets up file watchers** — watches `connections.json` and `local.settings.json` for changes; sends merged updates to the server via the `custom/updateConnections` notification.
 7. **Starts a token refresh loop** — periodically acquires Azure tokens and pushes them to the server via `custom/updateApiConfig`.
-8. **Registers commands** — `restartLanguageServer`, `openConnectionView`, `sdklsp.applyEdits` (for click-to-insert links in hover tooltips).
+8. **Registers commands** — `connectorSdk.restartLanguageServer`, `connectorSdk.openConnectionView`, `sdklsp.applyEdits` (for click-to-insert links in hover tooltips).
 
 ### LSP Server
 
@@ -75,7 +75,7 @@ textDocument/publishDiagnostics → VS Code
 | `AttributeValidator` | Attribute argument validity (e.g., connector names, operation IDs against `SdkIndex`) |
 | `ConnectionConfigValidator` | Whether required connections are configured for used connectors |
 | `TriggerPayloadValidator` | Trigger payload type conventions |
-| `DynamicValuesValidator` | `[DynamicValues]` parameter values against live API data |
+| `DynamicValuesValidator` | `[DynamicValues]` parameter values against cached dynamic values from `LSPStore.DynamicData` (populated by hover/completion handlers; no network calls) |
 | `SdkAntiPatternValidator` | Common anti-patterns in SDK usage |
 
 See [`.github/copilot-instructions.md`](../.github/copilot-instructions.md#architecture-diagnostic-validators) for validator authoring guidelines, including the analysis strategy and key implementation details.
@@ -205,7 +205,7 @@ sequenceDiagram
     alt First call (not yet discovered)
         Reg->>Disc: DiscoverOperations(sdkIndex, compilationService)
         Disc->>CS: CreateSdkMetadataCompilation()
-        Disc->>Disc: Analyze SDK types via reflection metadata
+        Disc->>Disc: Decompile SDK method bodies via ICSharpCode.Decompiler to extract API paths
         Disc-->>Reg: Dictionary<key, DynamicOperationMetadata>
     end
     Reg-->>HH: DynamicOperationMetadata (API path, HTTP method)
