@@ -103,7 +103,7 @@ sequenceDiagram
     VSCode->>VSCode: Scan .csproj for SDK PackageReference
     VSCode->>VSCode: Resolve SDK path (settings → assets → SDK/ → sibling repo)
     VSCode->>VSCode: Resolve server DLL path
-    VSCode->>VSCode: Build initializationOptions (API config, connections, telemetry)
+    VSCode->>VSCode: Build initializationOptions (API config, connections)
     VSCode->>Server: Start process: dotnet SdkLspServer.dll --sdk-assembly <dll>... or --sdk <nupkg>
     Server->>Index: SdkIndex.TryCreateAsync(nupkgPath) or TryCreateFromAssembliesAsync(dllPaths)
     Index-->>Server: SdkIndex (assemblies, types, connectorNames, triggerOperations)
@@ -287,4 +287,4 @@ For detailed validator authoring guidelines covering this strategy, see the [Arc
 - Step 2 is zero-configuration for normal projects — if the user has run `dotnet restore`, the SDK DLLs are already available
 - Step 3 supports manual SDK staging for evaluation or E2E testing
 - Step 4 enables F5 debugging of the SDK and LSP extension side by side
-- If no SDK is found and the project references the SDK package, the extension prompts the user to run `dotnet restore`
+- If no SDK is found and the project both references the SDK package and is missing `obj/project.assets.json` (i.e., `dotnet restore` has not been run), the extension prompts the user to restore
