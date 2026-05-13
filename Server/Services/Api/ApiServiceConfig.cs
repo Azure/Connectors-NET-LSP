@@ -30,7 +30,7 @@ public class ApiServiceConfig
     public string ApiVersion { get; set; } = string.Empty;
 
     /// <summary>
-    /// Returns the API version to use: the configured value, or the default if not set.
+    /// Gets the API version to use: the configured value, or the default if not set.
     /// </summary>
     [JsonIgnore]
     public string EffectiveApiVersion =>

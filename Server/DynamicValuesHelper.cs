@@ -35,6 +35,7 @@ internal static class DynamicValuesHelper
     /// Gets the count of connections matching a connector type.
     /// Used for diagnostic logging when resolution fails due to multiple matches.
     /// </summary>
+    /// <returns>The number of matching connections.</returns>
     public static int GetConnectionCountForConnector(ConnectionsService connectionsService, string connectorName)
     {
         ConnectionsConfig? connections = connectionsService.GetConnections();
@@ -45,6 +46,7 @@ internal static class DynamicValuesHelper
     /// Checks if a connection name is a valid connection key in the connections config.
     /// Returns false for values that look like method arguments (URLs, IDs) rather than connection keys.
     /// </summary>
+    /// <returns><see langword="true"/> if the connection name is a valid key; otherwise, <see langword="false"/>.</returns>
     public static bool IsValidConnectionKey(ConnectionsService connectionsService, string connectionName)
     {
         ConnectionsConfig? connections = connectionsService.GetConnections();
@@ -93,6 +95,7 @@ internal static class DynamicValuesHelper
     /// Infers the connector name from a method's containing type by stripping known suffixes.
     /// For example: SharePointOnlineClient -> sharepointonline, TeamsClient -> teams.
     /// </summary>
+    /// <returns>The inferred connector name in lowercase, or <see langword="null"/> if it cannot be determined.</returns>
     public static string? InferConnectorFromContainingType(string? containingTypeName)
     {
         if (string.IsNullOrEmpty(containingTypeName))

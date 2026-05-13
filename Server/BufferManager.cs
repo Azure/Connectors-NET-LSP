@@ -25,6 +25,7 @@ internal class BufferManager
     /// Gets all currently tracked document URIs and their contents.
     /// Used to re-trigger diagnostics when external state (e.g., connections) changes.
     /// </summary>
+    /// <returns>A snapshot of all tracked document URIs and their contents.</returns>
     public IReadOnlyDictionary<string, string> GetAllBuffers()
     {
         return new Dictionary<string, string>(this.buffers, this.buffers.Comparer);

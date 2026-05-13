@@ -15,6 +15,7 @@ internal static class ExceptionExtensions
     /// Determines whether the exception is fatal and should not be caught.
     /// </summary>
     /// <param name="exception">The exception to check.</param>
+    /// <returns><see langword="true"/> if the exception is fatal; otherwise, <see langword="false"/>.</returns>
     public static bool IsFatal(this Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);

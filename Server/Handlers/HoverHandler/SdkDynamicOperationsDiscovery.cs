@@ -475,6 +475,7 @@ internal static partial class SdkDynamicOperationsDiscovery
     /// Looks up operation metadata directly from the JSON configuration file.
     /// Used by DynamicOperationsRegistry as a fallback when SDK discovery doesn't find an operation.
     /// </summary>
+    /// <returns>The operation metadata, or <see langword="null"/> if not found in the configuration.</returns>
     public static DynamicOperationMetadata? GetOperationFromConfig(string connectorName, string operationName)
     {
         string key = $"{connectorName.ToLowerInvariant()}:{operationName}";

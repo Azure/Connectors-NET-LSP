@@ -50,6 +50,7 @@ public sealed class CompilationService
     /// <param name="documentUri">The URI of the document being compiled.</param>
     /// <param name="syntaxTree">The caller's parsed syntax tree. The returned semantic model is for this tree.</param>
     /// <param name="filePath">Optional file path used to resolve NuGet project references.</param>
+    /// <returns>A tuple containing the Roslyn compilation and the semantic model for the given syntax tree.</returns>
     public (CSharpCompilation Compilation, SemanticModel Model) GetCompilation(
         Uri documentUri,
         SyntaxTree syntaxTree,
@@ -113,6 +114,7 @@ public sealed class CompilationService
     /// Creates a compilation containing only SDK and core references, without any user source text.
     /// Used for metadata-only analysis such as dynamic operations discovery.
     /// </summary>
+    /// <returns>A Roslyn compilation containing only SDK and core assembly references.</returns>
     public CSharpCompilation CreateSdkMetadataCompilation()
     {
         var references = new List<MetadataReference>();
@@ -199,6 +201,7 @@ public sealed class CompilationService
     /// Searches the TRUSTED_PLATFORM_ASSEMBLIES list, runtime directory, and core library directory.
     /// </summary>
     /// <param name="assemblyFile">The file name of the assembly to locate (e.g., "System.Runtime.dll").</param>
+    /// <returns>The full path to the assembly, or <see langword="null"/> if not found.</returns>
     internal static string? TryGetTrustedAssemblyPath(string assemblyFile)
     {
         if (string.IsNullOrWhiteSpace(assemblyFile))
@@ -269,6 +272,7 @@ public sealed class CompilationService
     /// <param name="references">The collection of metadata references to add to.</param>
     /// <param name="seenPaths">A set tracking already processed assembly paths to prevent duplicates.</param>
     /// <param name="projectDirectory">The pre-resolved project directory containing the .csproj file.</param>
+    /// <returns>The number of assembly references added.</returns>
     internal static int AddProjectNuGetReferences(List<MetadataReference> references, HashSet<string> seenPaths, string projectDirectory)
     {
         // TODO(#9): NuGetReferenceCache never invalidates when project.assets.json changes
@@ -293,6 +297,7 @@ public sealed class CompilationService
     /// <summary>
     /// Walks up from a file path to find the directory containing a .csproj file.
     /// </summary>
+    /// <returns>The directory path containing the .csproj file, or <see langword="null"/> if not found.</returns>
     internal static string? FindProjectDirectory(string filePath)
     {
         string? directory = Path.GetDirectoryName(filePath);

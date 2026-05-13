@@ -191,6 +191,7 @@ internal class GenerateDynamicSchemaCommandHandler : ExecuteCommandHandlerBase
     /// <c>new GeneratedClassName()</c> in the source document. Does not modify
     /// AdditionalProperties access — those still work via inheritance.
     /// </summary>
+    /// <returns>The updated document text with dynamic type instantiations replaced.</returns>
     internal static string ApplySourceCodeUpdate(
         string documentText,
         string dynamicTypeName,

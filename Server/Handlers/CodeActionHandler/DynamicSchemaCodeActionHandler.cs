@@ -138,6 +138,7 @@ internal class DynamicSchemaCodeActionHandler(
     /// Uses syntax tree parsing and a cached SdkIndex type name + [DynamicSchema] operationId lookup.
     /// Schema fetch and code generation happen in GenerateDynamicSchemaCommandHandler when clicked.
     /// </summary>
+    /// <returns>The detected dynamic schema type info, or <see langword="null"/> if the cursor is not on a dynamic type.</returns>
     internal DynamicSchemaTypeInfo? DetectDynamicSchemaType(
         string documentText,
         OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range,
@@ -305,6 +306,7 @@ internal class DynamicSchemaCodeActionHandler(
     /// Generates a clean class name from the dynamic type name.
     /// E.g., "DynamicPostMessageRequest" → "PostMessageInput".
     /// </summary>
+    /// <returns>The generated class name.</returns>
     internal static string GenerateClassName(string dynamicTypeName)
     {
         string name = dynamicTypeName;

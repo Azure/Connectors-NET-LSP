@@ -933,6 +933,7 @@ internal class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager
     /// Reads a sibling parameter value from an AttributeSyntax.
     /// For example, reading "ConnectorName" when the cursor is at "OperationName".
     /// </summary>
+    /// <returns>The parameter value, or <see langword="null"/> if not found.</returns>
     internal static string? ReadSiblingAttributeParameterValue(AttributeSyntax attribute, string parameterName)
     {
         if (attribute.ArgumentList is null)
@@ -978,6 +979,7 @@ internal class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager
     /// When the context window contains multiple attributes (e.g., stacked trigger methods),
     /// narrows the search to the last attribute to avoid reading values from the wrong one.
     /// </summary>
+    /// <returns>The extracted parameter value, or <see langword="null"/> if not found.</returns>
     internal static string? ExtractParameterValueFromText(string contextText, string parameterName)
     {
         // Narrow to the last attribute in the context so we don't match

@@ -108,6 +108,7 @@ public sealed class SdkIndex
     /// Creates an <see cref="SdkIndex"/> with explicit connector names and trigger operations.
     /// Intended for unit testing only.
     /// </summary>
+    /// <returns>A new <see cref="SdkIndex"/> instance for testing.</returns>
     internal static SdkIndex CreateForTesting(
         IEnumerable<SdkConstant> connectorNames,
         IDictionary<string, ImmutableArray<SdkConstant>> triggerOperations,
@@ -125,6 +126,7 @@ public sealed class SdkIndex
     /// <summary>
     /// Gets trigger operations for a specific connector name (case-insensitive).
     /// </summary>
+    /// <returns>The trigger operations for the connector, or an empty array if none exist.</returns>
     public ImmutableArray<SdkConstant> GetTriggerOperations(string connectorName)
     {
         return TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations)
@@ -135,6 +137,7 @@ public sealed class SdkIndex
     /// <summary>
     /// Gets all trigger operations from all connectors.
     /// </summary>
+    /// <returns>All trigger operations across all connectors.</returns>
     public IEnumerable<SdkConstant> GetAllTriggerOperations()
     {
         return TriggerOperationsByConnector.Values.SelectMany(operations => operations);
@@ -144,6 +147,7 @@ public sealed class SdkIndex
     /// Maps an operation name to its corresponding TriggerPayload type name.
     /// Convention: {Connector}{OperationName}TriggerPayload.
     /// </summary>
+    /// <returns>The payload type name, or <see langword="null"/> if the operation is not found.</returns>
     public string? GetPayloadTypeForOperation(string connectorName, string operationName)
     {
         if (!TriggerOperationsByConnector.TryGetValue(connectorName, out ImmutableArray<SdkConstant> operations) || operations.IsEmpty)
@@ -202,6 +206,7 @@ public sealed class SdkIndex
     /// are read directly via MetadataLoadContext.
     /// </summary>
     /// <param name="assemblyPaths">One or more paths to SDK assembly DLLs.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the created <see cref="SdkIndex"/>, or <see langword="null"/> if creation failed.</returns>
     public static async Task<SdkIndex?> TryCreateFromAssembliesAsync(params string[] assemblyPaths)
     {
         if (assemblyPaths is null || assemblyPaths.Length == 0)
