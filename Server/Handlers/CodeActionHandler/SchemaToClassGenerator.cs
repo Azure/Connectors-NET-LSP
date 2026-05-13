@@ -18,6 +18,7 @@ internal static class SchemaToClassGenerator
     /// <param name="baseClassNamespace">The namespace of the base class.</param>
     /// <param name="schema">The JSON Schema describing the properties.</param>
     /// <param name="targetNamespace">The namespace for the generated class.</param>
+    /// <returns>The generated C# class source code.</returns>
     public static string GenerateClass(
         string className,
         string baseClassName,
@@ -116,6 +117,7 @@ internal static class SchemaToClassGenerator
     /// Maps a JSON Schema type to a C# type string. For nested objects with properties,
     /// generates a new class and returns its name.
     /// </summary>
+    /// <returns>The C# type string corresponding to the JSON Schema type.</returns>
     internal static string ResolveCSharpType(JsonElement schema, string propertyName, List<string> nestedClasses)
     {
         string? schemaType = null;
@@ -196,6 +198,7 @@ internal static class SchemaToClassGenerator
     /// <summary>
     /// Converts a camelCase or snake_case JSON property name to PascalCase.
     /// </summary>
+    /// <returns>The PascalCase string.</returns>
     internal static string ToPascalCase(string jsonName)
     {
         if (string.IsNullOrEmpty(jsonName))

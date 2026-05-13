@@ -17,6 +17,7 @@ internal static class LevenshteinDistance
     /// </summary>
     /// <param name="source">The source string.</param>
     /// <param name="target">The target string.</param>
+    /// <returns>The Levenshtein distance between the two strings.</returns>
     public static int Compute(string source, string target)
     {
         if (string.IsNullOrEmpty(source))

@@ -146,7 +146,7 @@ public async Task<Response> ProcessAsync(Request request)
 **Rules:**
 
 - End descriptions with period
-- Do NOT document return values (`<returns>` tag)
+- Document return values with `<returns>` tags on all public methods
 - Use `<see cref="ClassName"/>` for type references
 
 ### Exception Handling

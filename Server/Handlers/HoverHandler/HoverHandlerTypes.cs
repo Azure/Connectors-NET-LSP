@@ -159,7 +159,7 @@ internal static class HoverHandlerTypes
 
     /// <summary>
     /// Generic response from API Hub runtime endpoints that return a list of items.
-    /// Shape: { "value": [ { "Name": "...", "DisplayName": "..." }, ... ] }
+    /// Shape: { "value": [ { "Name": "...", "DisplayName": "..." }, ... ] }.
     /// </summary>
     internal class DynamicValuesListResponse
     {

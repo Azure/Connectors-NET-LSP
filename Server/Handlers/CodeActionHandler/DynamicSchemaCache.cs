@@ -14,6 +14,7 @@ internal static class DynamicSchemaCache
     /// <summary>
     /// Builds a complete cache from all SDK assemblies: type name → operationId.
     /// </summary>
+    /// <returns>A dictionary mapping type names to operation IDs.</returns>
     public static Dictionary<string, string> Build(IEnumerable<string> assemblyPaths)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -34,6 +35,7 @@ internal static class DynamicSchemaCache
     /// Scans a single assembly for types with [DynamicSchema("operationId")] and returns
     /// a dictionary of simple type name → operationId.
     /// </summary>
+    /// <returns>A dictionary mapping type names to operation IDs from the assembly.</returns>
     public static Dictionary<string, string> ScanAssemblyForDynamicSchema(string assemblyPath)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);

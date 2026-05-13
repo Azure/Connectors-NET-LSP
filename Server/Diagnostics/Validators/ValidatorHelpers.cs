@@ -23,6 +23,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Finds a named argument in an attribute by parameter name.
     /// </summary>
+    /// <returns>The matching attribute argument, or <see langword="null"/> if not found.</returns>
     public static AttributeArgumentSyntax? FindNamedArgument(AttributeSyntax attribute, string parameterName)
     {
         if (attribute.ArgumentList is null)
@@ -42,6 +43,7 @@ internal static class ValidatorHelpers
     /// For bare identifiers, returns the identifier text. This is a purely syntactic
     /// extraction — no semantic constant evaluation is performed.
     /// </summary>
+    /// <returns>The extracted string value, or <see langword="null"/> if the expression is not a recognized form.</returns>
     public static string? ExtractStringValue(AttributeArgumentSyntax argument)
     {
         if (argument.Expression is LiteralExpressionSyntax literal &&
@@ -68,6 +70,7 @@ internal static class ValidatorHelpers
     /// For example, "MyNamespace.ConnectorTriggerMetadata" and
     /// "global::ConnectorTriggerMetadata" both return "ConnectorTriggerMetadata".
     /// </summary>
+    /// <returns>The rightmost identifier portion of the attribute name.</returns>
     public static string ExtractRightmostIdentifier(string attributeName)
     {
         int lastDot = attributeName.LastIndexOf('.');
@@ -87,6 +90,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Determines whether the attribute name matches [ConnectorTriggerMetadata] or [ConnectorTrigger].
     /// </summary>
+    /// <returns><see langword="true"/> if the attribute name matches a trigger metadata attribute; otherwise, <see langword="false"/>.</returns>
     public static bool IsTriggerMetadataAttribute(string attributeName)
     {
         string identifier = ValidatorHelpers.ExtractRightmostIdentifier(attributeName);
@@ -99,6 +103,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Converts a Roslyn <see cref="TextSpan"/> to an LSP <see cref="LspRange"/>.
     /// </summary>
+    /// <returns>The equivalent LSP range.</returns>
     public static LspRange ToLspRange(TextSpan span, SourceText sourceText)
     {
         LinePosition start = sourceText.Lines.GetLinePosition(span.Start);
@@ -112,6 +117,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Gets the LSP range covering the attribute name for diagnostic placement.
     /// </summary>
+    /// <returns>The LSP range covering the attribute name.</returns>
     public static LspRange GetAttributeNameRange(AttributeSyntax attribute, SourceText sourceText)
     {
         TextSpan span = attribute.Name.Span;
@@ -121,6 +127,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Gets the LSP range covering the argument value expression for diagnostic placement.
     /// </summary>
+    /// <returns>The LSP range covering the argument value expression.</returns>
     public static LspRange GetArgumentValueRange(AttributeArgumentSyntax argument, SourceText sourceText)
     {
         TextSpan span = argument.Expression.Span;
@@ -130,6 +137,7 @@ internal static class ValidatorHelpers
     /// <summary>
     /// Creates an LSP diagnostic with standard source.
     /// </summary>
+    /// <returns>A new LSP diagnostic with the specified properties.</returns>
     public static LspDiagnostic CreateDiagnostic(
         LspRange range,
         LspDiagnosticSeverity severity,

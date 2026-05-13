@@ -10,13 +10,13 @@ namespace SdkLspServer.Services.Connections;
 public class DirectClientConnection
 {
     /// <summary>
-    /// The connector type identifier (e.g., "office365", "sharepointonline").
+    /// Gets or sets the connector type identifier (e.g., "office365", "sharepointonline").
     /// </summary>
     [JsonPropertyName("connectorType")]
     public string ConnectorType { get; set; } = string.Empty;
 
     /// <summary>
-    /// The connection runtime URL from which the ARM connection resource name is derived.
+    /// Gets or sets the connection runtime URL from which the ARM connection resource name is derived.
     /// Format: https://{instance}.azure-apihub.net/apim/{connectorType}/{connectionResourceName}.
     /// </summary>
     [JsonPropertyName("connectionRuntimeUrl")]

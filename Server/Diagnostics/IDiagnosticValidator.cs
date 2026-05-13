@@ -20,6 +20,7 @@ internal interface IDiagnosticValidator
     /// <param name="documentText">The full text content of the document.</param>
     /// <param name="sdkIndex">The SDK index for type and assembly lookups. May be null if the SDK failed to load.</param>
     /// <param name="cancellationToken">Cancellation token to abort analysis.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the list of diagnostics found.</returns>
     Task<IReadOnlyList<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>> ValidateAsync(
         DocumentUri documentUri,
         string documentText,

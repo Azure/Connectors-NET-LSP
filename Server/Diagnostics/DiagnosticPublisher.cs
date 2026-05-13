@@ -82,6 +82,7 @@ internal sealed class DiagnosticPublisher : IDisposable
     /// <param name="documentUri">The URI of the document to validate.</param>
     /// <param name="documentText">The full text of the document.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that represents the asynchronous publish operation.</returns>
     public async Task PublishDiagnosticsAsync(
         DocumentUri documentUri,
         string documentText,

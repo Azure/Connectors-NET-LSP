@@ -12,6 +12,7 @@ internal static partial class LogSanitizer
     /// Redacts sensitive segments from URLs and identifiers commonly found in
     /// Azure API Hub URLs, ARM resource paths, and connection runtime URLs.
     /// </summary>
+    /// <returns>The sanitized URL with sensitive segments redacted.</returns>
     public static string SanitizeUrl(string url)
     {
         // Redact subscription IDs: /subscriptions/{guid-or-id}/

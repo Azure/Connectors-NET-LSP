@@ -10,7 +10,7 @@ namespace SdkLspServer.Services.CodeLens;
 public class CodeLensConfig
 {
     /// <summary>
-    /// The VS Code command name invoked when the user clicks a "Create connection" CodeLens.
+    /// Gets or sets the VS Code command name invoked when the user clicks a "Create connection" CodeLens.
     /// Defaults to a generic command name; the client extension should register this command.
     /// </summary>
     [JsonPropertyName("openConnectionViewCommand")]
