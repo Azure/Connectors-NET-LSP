@@ -1,9 +1,9 @@
 # Default owners
-* @Azure/azure-logicapps-team
+* @Azure/connectors-sdk-maintainers
 
 # Server
-/Server/ @Azure/azure-logicapps-team
-/Server.Tests/ @Azure/azure-logicapps-team
+/Server/ @Azure/connectors-sdk-maintainers
+/Server.Tests/ @Azure/connectors-sdk-maintainers
 
 # VS Code extension
-/vscode-extension/ @Azure/azure-logicapps-team
+/vscode-extension/ @Azure/connectors-sdk-maintainers
