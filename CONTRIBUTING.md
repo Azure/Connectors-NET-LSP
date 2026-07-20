@@ -43,6 +43,7 @@ dotnet test
 - Include tests for new functionality
 - Update documentation if behavior changes
 - Follow the existing code style (see [copilot-instructions.md](.github/copilot-instructions.md) for conventions)
+- PRs must pass the cross-platform CI build-and-test matrix before they can merge
 
 ### Reporting Issues
 
