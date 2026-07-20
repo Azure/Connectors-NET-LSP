@@ -46,7 +46,7 @@ dotnet test
 
 ### Automated PR Validation
 
-PRs targeting `main` must pass the `build-and-test (ubuntu-latest)` and `build-and-test (windows-latest)` CI checks. This cross-platform validation restores dependencies, builds the LSP server and extension, verifies formatting, and runs the unit tests.
+PRs targeting `main` must pass the `build-and-test (ubuntu-latest)` and `build-and-test (windows-latest)` CI checks. This cross-platform validation restores dependencies, builds the .NET LSP server and test projects, and runs the unit tests. Formatting and Markdown linting run in the separate Ubuntu `lint` job.
 
 This validation does not publish an extension, create a release, or change the current extension version.
 
