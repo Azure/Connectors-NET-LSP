@@ -43,7 +43,12 @@ dotnet test
 - Include tests for new functionality
 - Update documentation if behavior changes
 - Follow the existing code style (see [copilot-instructions.md](.github/copilot-instructions.md) for conventions)
-- PRs must pass the cross-platform CI build-and-test matrix before they can merge
+
+### Automated PR Validation
+
+PRs targeting `main` must pass the `build-and-test (ubuntu-latest)` and `build-and-test (windows-latest)` CI checks. This cross-platform validation restores dependencies, builds the LSP server and extension, verifies formatting, and runs the unit tests.
+
+This validation does not publish an extension, create a release, or change the current extension version.
 
 ### Reporting Issues
 
