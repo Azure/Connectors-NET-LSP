@@ -44,6 +44,12 @@ dotnet test
 - Update documentation if behavior changes
 - Follow the existing code style (see [copilot-instructions.md](.github/copilot-instructions.md) for conventions)
 
+### Automated PR Validation
+
+PRs targeting `main` must pass the `build-and-test (ubuntu-latest)` and `build-and-test (windows-latest)` CI checks. This cross-platform validation restores dependencies, builds the .NET LSP server and test projects, and runs the unit tests. Formatting and Markdown linting run in the separate Ubuntu `lint` job.
+
+This validation does not publish an extension, create a release, or change the current extension version.
+
 ### Reporting Issues
 
 - Use [GitHub Issues](https://github.com/Azure/Connectors-NET-LSP/issues) to report bugs or request features
