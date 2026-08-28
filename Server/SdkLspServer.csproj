@@ -35,7 +35,7 @@
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
       <!-- SharpZipLib provides ZIP handling for NuGet packages -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
-    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.6.0" />
+    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.7.2" />
   </ItemGroup>
 
   <!-- Custom build targets for easy publishing -->
