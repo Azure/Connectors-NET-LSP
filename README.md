@@ -27,6 +27,7 @@ A Language Server Protocol (LSP) server and VS Code extension that provides inte
 ## Requirements
 
 - .NET SDK 8.0+
+- Node.js 22+ (for VS Code extension development and packaging)
 - A Connectors SDK `.nupkg` (loaded automatically from `SDK/` directory or via `--sdk` argument)
 - An LSP-compatible editor (VS Code recommended — a purpose-built extension is included)
 
@@ -124,6 +125,7 @@ git push origin v0.2.0
 - **Version already matches:** `npm version` fails with "Version not changed" if `package.json` already has the target version. The workflow uses `--allow-same-version` to handle this, so it's safe to set the version in the PR and tag the same value.
 - **Dirty working tree:** `npm version` fails on a dirty git tree. The workflow runs the version bump *before* `dotnet publish` (which creates files in `vscode-extension/server/`) to avoid this.
 - **Engine version alignment:** `vsce package` fails if `@types/vscode` version exceeds `engines.vscode` in `package.json`. Keep them aligned when upgrading either.
+- **Node.js version alignment:** The extension and release workflow require Node.js 22 or later because `@vscode/vsce` requires Node.js 22 or later.
 - **Verifying installed build:** The LSP server assembly version defaults to `1.0.0.0`. To confirm which build is running, check the DLL path in the extension output — VSIX installs load from `~/.vscode/extensions/microsoft.connector-sdk-intellisense-<version>/server/`.
 
 The extension automatically:
