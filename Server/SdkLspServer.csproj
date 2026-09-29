@@ -23,7 +23,7 @@
   <ItemGroup>
     <None Include="Handlers/HoverHandler/DynamicOperationsMetadata.json" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="ICSharpCode.Decompiler" Version="11.0.0.9375" />
+    <PackageReference Include="ICSharpCode.Decompiler" Version="11.1.0.9782" />
     <PackageReference Include="Microsoft.ApplicationInsights" Version="3.1.2" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="3.1.2" />
     <PackageReference Include="Microsoft.CodeAnalysis" Version="5.9.0" />
@@ -35,7 +35,7 @@
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
       <!-- SharpZipLib provides ZIP handling for NuGet packages -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
-    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.8.0" />
+    <PackageReference Include="ZiggyCreatures.FusionCache" Version="2.9.0" />
   </ItemGroup>
 
   <!-- Custom build targets for easy publishing -->
