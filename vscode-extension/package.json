@@ -89,11 +89,11 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "vscode-languageclient": "^10.1.1"
+    "vscode-languageclient": "^10.1.2"
   },
   "devDependencies": {
-    "@types/node": "^26.5.1",
-    "@types/vscode": "^1.137.0",
+    "@types/node": "^26.6.3",
+    "@types/vscode": "^1.138.0",
     "@vscode/vsce": "^4.0.0",
     "typescript": "^7.0.2"
   }
