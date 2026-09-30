@@ -11,7 +11,7 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 ### Prerequisites
 
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download)
-- [Node.js](https://nodejs.org/) (for VS Code extension development)
+- [Node.js 22+](https://nodejs.org/) (for VS Code extension development)
 - [Git](https://git-scm.com/downloads)
 
 ### Building

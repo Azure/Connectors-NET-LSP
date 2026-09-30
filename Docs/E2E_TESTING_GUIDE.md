@@ -23,7 +23,7 @@ The guide uses the [Connectors-NET-SDK](https://github.com/Azure/Connectors-NET-
 | Requirement | Version | Check |
 |-------------|---------|-------|
 | .NET SDK | 8.0+ | `dotnet --version` |
-| Node.js | 18+ | `node --version` |
+| Node.js | 22+ | `node --version` |
 | npm | 9+ | `npm --version` |
 | VS Code | Latest | `code --version` |
 | Git | Any | `git --version` |
