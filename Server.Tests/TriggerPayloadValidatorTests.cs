@@ -193,7 +193,7 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeMismatch, StringComparison.Ordinal));
         Assert.IsNotNull(mismatch, message: "Expected CSDK200 for wrong payload type.");
         Assert.AreEqual(DiagnosticSeverity.Error, mismatch.Severity);
-        Assert.IsTrue(mismatch.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.String!.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 
     // ---------------------------------------------------------------
@@ -234,7 +234,7 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadWeakType, StringComparison.Ordinal));
         Assert.IsNotNull(weakType, message: "Expected CSDK201 for weak type 'object'.");
         Assert.AreEqual(DiagnosticSeverity.Warning, weakType.Severity);
-        Assert.IsTrue(weakType.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+        Assert.IsTrue(weakType.Message.String!.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -349,8 +349,8 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadTypeNotFound, StringComparison.Ordinal));
         Assert.IsNotNull(notFound, message: "Expected CSDK202 for unknown type.");
         Assert.AreEqual(DiagnosticSeverity.Error, notFound.Severity);
-        Assert.IsTrue(notFound.Message.Contains("CompletelyFakeType", StringComparison.Ordinal));
-        Assert.IsTrue(notFound.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+        Assert.IsTrue(notFound.Message.String!.Contains("CompletelyFakeType", StringComparison.Ordinal));
+        Assert.IsTrue(notFound.Message.String!.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 
     // ---------------------------------------------------------------
@@ -405,7 +405,7 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadOperationUnmapped, StringComparison.Ordinal));
         Assert.IsNotNull(unmapped, message: "Expected CSDK203 when operation has no payload mapping.");
         Assert.AreEqual(DiagnosticSeverity.Warning, unmapped.Severity);
-        Assert.IsTrue(unmapped.Message.Contains("OnNewEmail", StringComparison.Ordinal));
+        Assert.IsTrue(unmapped.Message.String!.Contains("OnNewEmail", StringComparison.Ordinal));
     }
 
     // ---------------------------------------------------------------
@@ -446,9 +446,9 @@ public class TriggerPayloadValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.TriggerPayloadNotPayloadType, StringComparison.Ordinal));
         Assert.IsNotNull(notPayload, message: "Expected CSDK204 for non-payload type.");
         Assert.AreEqual(DiagnosticSeverity.Warning, notPayload.Severity);
-        Assert.IsTrue(notPayload.Message.Contains("GraphClientReceiveMessage", StringComparison.Ordinal));
-        Assert.IsTrue(notPayload.Message.Contains("naming convention", StringComparison.Ordinal));
-        Assert.IsTrue(notPayload.Message.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
+        Assert.IsTrue(notPayload.Message.String!.Contains("GraphClientReceiveMessage", StringComparison.Ordinal));
+        Assert.IsTrue(notPayload.Message.String!.Contains("naming convention", StringComparison.Ordinal));
+        Assert.IsTrue(notPayload.Message.String!.Contains("Office365OnNewEmailTriggerPayload", StringComparison.Ordinal));
     }
 
     // ---------------------------------------------------------------
