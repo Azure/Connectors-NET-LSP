@@ -113,7 +113,7 @@ public sealed class SdkAntiPatternValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorOperationValueUnknown, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK401 for unknown operation name.");
         Assert.AreEqual(DiagnosticSeverity.Warning, result.Severity);
-        Assert.IsTrue(result.Message.Contains("NonexistentOp", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("NonexistentOp", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -300,7 +300,7 @@ public sealed class SdkAntiPatternValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.WrongPayloadTypeDirection, StringComparison.Ordinal));
         Assert.IsNotNull(result2, message: "Expected CSDK402 for Input type receiving await result.");
         Assert.AreEqual(DiagnosticSeverity.Information, result2.Severity);
-        Assert.IsTrue(result2.Message.Contains("Office365SendEmailOutput", StringComparison.Ordinal));
+        Assert.IsTrue(result2.Message.String!.Contains("Office365SendEmailOutput", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -403,7 +403,7 @@ public sealed class SdkAntiPatternValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorExceptionWithoutStatusCode, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK403 for ConnectorException without StatusCode check.");
         Assert.AreEqual(DiagnosticSeverity.Warning, result.Severity);
-        Assert.IsTrue(result.Message.Contains("StatusCode", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("StatusCode", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -591,7 +591,7 @@ public sealed class SdkAntiPatternValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.AsyncConnectorCallWithoutAwait, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK404 for async connector call without await.");
         Assert.AreEqual(DiagnosticSeverity.Warning, result.Severity);
-        Assert.IsTrue(result.Message.Contains("SendEmailAsync", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("SendEmailAsync", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -691,7 +691,7 @@ public sealed class SdkAntiPatternValidatorTests
         Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.AsyncConnectorCallWithoutAwait, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK404 for chained ConfigureAwait without await.");
-        Assert.IsTrue(result.Message.Contains("SendEmailAsync", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("SendEmailAsync", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -762,7 +762,7 @@ public sealed class SdkAntiPatternValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.CancellationTokenNotPassed, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK405 when CancellationToken is available but not passed.");
         Assert.AreEqual(DiagnosticSeverity.Warning, result.Severity);
-        Assert.IsTrue(result.Message.Contains("cancellationToken", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("cancellationToken", StringComparison.Ordinal));
     }
 
     [TestMethod]

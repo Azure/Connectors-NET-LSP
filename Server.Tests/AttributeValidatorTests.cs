@@ -74,7 +74,7 @@ public class AttributeValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.UnknownConnectorName, StringComparison.Ordinal));
         Assert.IsNotNull(unknown, message: "Expected CSDK001 for unknown connector name.");
         Assert.AreEqual(DiagnosticSeverity.Error, unknown.Severity);
-        Assert.IsTrue(unknown.Message.Contains("nonexistent", StringComparison.Ordinal));
+        Assert.IsTrue(unknown.Message.String!.Contains("nonexistent", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -108,7 +108,7 @@ public class AttributeValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorNameTypo, StringComparison.Ordinal));
         Assert.IsNotNull(typo, message: "Expected CSDK002 for typo in connector name.");
         Assert.AreEqual(DiagnosticSeverity.Warning, typo.Severity);
-        Assert.IsTrue(typo.Message.Contains("office365", StringComparison.Ordinal));
+        Assert.IsTrue(typo.Message.String!.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public class AttributeValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectorNameCasing, StringComparison.Ordinal));
         Assert.IsNotNull(casing, message: "Expected CSDK003 for wrong casing.");
         Assert.AreEqual(DiagnosticSeverity.Warning, casing.Severity);
-        Assert.IsTrue(casing.Message.Contains("office365", StringComparison.Ordinal));
+        Assert.IsTrue(casing.Message.String!.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -341,8 +341,8 @@ public class AttributeValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.UnknownOperationName, StringComparison.Ordinal));
         Assert.IsNotNull(unknown, message: "Expected CSDK007 for unknown operation name.");
         Assert.AreEqual(DiagnosticSeverity.Error, unknown.Severity);
-        Assert.IsTrue(unknown.Message.Contains("OnNewSomething", StringComparison.Ordinal));
-        Assert.IsTrue(unknown.Message.Contains("OnNewEmail", StringComparison.Ordinal));
+        Assert.IsTrue(unknown.Message.String!.Contains("OnNewSomething", StringComparison.Ordinal));
+        Assert.IsTrue(unknown.Message.String!.Contains("OnNewEmail", StringComparison.Ordinal));
     }
 
     [TestMethod]
