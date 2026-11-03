@@ -143,7 +143,7 @@ public class DynamicValuesValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK300 for 'foobar' not in cached values.");
         Assert.AreEqual(DiagnosticSeverity.Warning, result.Severity);
-        Assert.IsTrue(result.Message.Contains("foobar", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("foobar", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -379,7 +379,7 @@ public class DynamicValuesValidatorTests
         Diagnostic? result = diagnostics.FirstOrDefault(diagnostic =>
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.DynamicValuesInvalidValue, StringComparison.Ordinal));
         Assert.IsNotNull(result, message: "Expected CSDK300 for named argument with invalid value.");
-        Assert.IsTrue(result.Message.Contains("foobar", StringComparison.Ordinal));
+        Assert.IsTrue(result.Message.String!.Contains("foobar", StringComparison.Ordinal));
     }
 
     // ---------------------------------------------------------------

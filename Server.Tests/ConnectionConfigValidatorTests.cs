@@ -160,7 +160,7 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionParameterValueInvalid, StringComparison.Ordinal));
         Assert.IsNotNull(invalid, message: "Expected CSDK100 for connection value not in config.");
         Assert.AreEqual(DiagnosticSeverity.Warning, invalid.Severity);
-        Assert.IsTrue(invalid.Message.Contains("nonexistent-conn", StringComparison.Ordinal));
+        Assert.IsTrue(invalid.Message.String!.Contains("nonexistent-conn", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -285,7 +285,7 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.NoConnectionConfigured, StringComparison.Ordinal));
         Assert.IsNotNull(noConnection, message: "Expected CSDK102 for connector with no configured connection.");
         Assert.AreEqual(DiagnosticSeverity.Error, noConnection.Severity);
-        Assert.IsTrue(noConnection.Message.Contains("office365", StringComparison.Ordinal));
+        Assert.IsTrue(noConnection.Message.String!.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -352,7 +352,7 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionMissing, StringComparison.Ordinal));
         Assert.IsNotNull(missing, message: "Expected CSDK103 for missing connection name in attribute.");
         Assert.AreEqual(DiagnosticSeverity.Warning, missing.Severity);
-        Assert.IsTrue(missing.Message.Contains("missing-conn", StringComparison.Ordinal));
+        Assert.IsTrue(missing.Message.String!.Contains("missing-conn", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -419,8 +419,8 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.MultipleConnectionsAmbiguous, StringComparison.Ordinal));
         Assert.IsNotNull(ambiguous, message: "Expected CSDK104 when multiple connections match connector.");
         Assert.AreEqual(DiagnosticSeverity.Warning, ambiguous.Severity);
-        Assert.IsTrue(ambiguous.Message.Contains("office365-conn-1", StringComparison.Ordinal));
-        Assert.IsTrue(ambiguous.Message.Contains("office365-conn-2", StringComparison.Ordinal));
+        Assert.IsTrue(ambiguous.Message.String!.Contains("office365-conn-1", StringComparison.Ordinal));
+        Assert.IsTrue(ambiguous.Message.String!.Contains("office365-conn-2", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -531,8 +531,8 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionTypeMismatch, StringComparison.Ordinal));
         Assert.IsNotNull(mismatch, message: "Expected CSDK105 when connection type doesn't match connector type.");
         Assert.AreEqual(DiagnosticSeverity.Warning, mismatch.Severity);
-        Assert.IsTrue(mismatch.Message.Contains("sharepointonline", StringComparison.Ordinal));
-        Assert.IsTrue(mismatch.Message.Contains("office365", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.String!.Contains("sharepointonline", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.String!.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -601,8 +601,8 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.ConnectionTypeMismatch, StringComparison.Ordinal));
         Assert.IsNotNull(mismatch, message: "Expected CSDK105 for invocation with connection type mismatch.");
         Assert.AreEqual(DiagnosticSeverity.Warning, mismatch.Severity);
-        Assert.IsTrue(mismatch.Message.Contains("sharepointonline", StringComparison.Ordinal));
-        Assert.IsTrue(mismatch.Message.Contains("office365", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.String!.Contains("sharepointonline", StringComparison.Ordinal));
+        Assert.IsTrue(mismatch.Message.String!.Contains("office365", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -672,7 +672,7 @@ public class ConnectionConfigValidatorTests
         Diagnostic? noConnection = diagnostics.FirstOrDefault(diagnostic =>
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.NoConnectionConfigured, StringComparison.Ordinal));
         Assert.IsNotNull(noConnection, message: "Expected CSDK102 for teams connector with no configured connection.");
-        Assert.IsTrue(noConnection.Message.Contains("teams", StringComparison.Ordinal));
+        Assert.IsTrue(noConnection.Message.String!.Contains("teams", StringComparison.Ordinal));
     }
 
     [TestMethod]
@@ -708,7 +708,7 @@ public class ConnectionConfigValidatorTests
             string.Equals(diagnostic.Code?.String, DiagnosticCodes.NoConnectionConfigured, StringComparison.Ordinal));
         Assert.IsNotNull(noConnection, message: "Expected CSDK102 for connector type inferred from invocation with no configured connection.");
         Assert.AreEqual(DiagnosticSeverity.Error, noConnection.Severity);
-        Assert.IsTrue(noConnection.Message.Contains("teams", StringComparison.Ordinal));
+        Assert.IsTrue(noConnection.Message.String!.Contains("teams", StringComparison.Ordinal));
     }
 
     [TestMethod]
