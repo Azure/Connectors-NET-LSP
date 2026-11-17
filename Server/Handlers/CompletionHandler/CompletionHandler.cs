@@ -1861,8 +1861,8 @@ internal class CompletionHandler(SdkIndex? sdkIndex, BufferManager bufferManager
             return forms == null || forms.Count == 0
                 ? (IEnumerable<DynamicValueItem>?)null
                 : forms.Select(form => new DynamicValueItem(
-                $"\"{form.Id}\"",
-                form.Title ?? "Untitled Form"));
+                    $"\"{form.Id}\"",
+                    form.Title ?? "Untitled Form"));
         }
         catch (Exception ex) when (!ex.IsFatal())
         {
