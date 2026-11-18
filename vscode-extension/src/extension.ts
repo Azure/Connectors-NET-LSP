@@ -400,7 +400,7 @@ async function resolveSdkPath(
     if (context) {
         const sdkRepoBuildDir = path.join(
             context.extensionPath, "..", "..",
-            "Connectors-NET-SDK", "src", "Microsoft.Azure.Connectors.Sdk", "bin", "Debug"
+            "Connectors-NET-SDK", "src", "Azure.Connectors.Sdk", "bin", "Debug"
         );
         const found = await findNewestNupkgInDir(sdkRepoBuildDir);
         if (found) {
@@ -411,8 +411,8 @@ async function resolveSdkPath(
     return undefined;
 }
 
-const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
-const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
+const SDK_PACKAGE_NAME = "Azure.Connectors.Sdk";
+const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Microsoft.Azure.Connectors.Sdk"];
 const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerCase() + "/");
 const SDK_PACKAGE_REF_PATTERNS = SDK_PACKAGE_NAMES.map((name) => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -547,6 +547,21 @@ async function checkForMissingRestore(
     return { needsRestore: false, projectDir: undefined, projectPath: undefined };
 }
 
+/**
+ * Selects the SDK entry from project.assets.json library keys, preferring package IDs in
+ * SDK_PACKAGE_NAMES order so the GA package wins over a preview package. Matching is
+ * case-insensitive because NuGet may normalize keys.
+ */
+export function selectSdkLibraryKey(libraryKeys: readonly string[]): string | undefined {
+    for (const prefix of SDK_PACKAGE_PREFIXES_LOWER) {
+        const match = libraryKeys.find((key) => key.toLowerCase().startsWith(prefix));
+        if (match) {
+            return match;
+        }
+    }
+    return undefined;
+}
+
 async function findSdkFromProjectAssets(
     folderPath: string,
     outputChannel?: vscode.OutputChannel,
@@ -573,11 +588,7 @@ async function findSdkFromProjectAssets(
                     targets?: Record<string, Record<string, { compile?: Record<string, unknown> }>>;
                 };
 
-                // Find the SDK library entry (case-insensitive — NuGet may normalize keys)
-                const sdkLibKey = Object.keys(assets.libraries ?? {}).find((key) => {
-                    const keyLower = key.toLowerCase();
-                    return SDK_PACKAGE_PREFIXES_LOWER.some((prefix) => keyLower.startsWith(prefix));
-                });
+                const sdkLibKey = selectSdkLibraryKey(Object.keys(assets.libraries ?? {}));
 
                 if (!sdkLibKey || !assets.libraries?.[sdkLibKey]?.path) {
                     continue;
