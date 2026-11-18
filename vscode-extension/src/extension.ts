@@ -400,7 +400,7 @@ async function resolveSdkPath(
     if (context) {
         const sdkRepoBuildDir = path.join(
             context.extensionPath, "..", "..",
-            "Connectors-NET-SDK", "src", "Microsoft.Azure.Connectors.Sdk", "bin", "Debug"
+            "Connectors-NET-SDK", "src", "Azure.Connectors.Sdk", "bin", "Debug"
         );
         const found = await findNewestNupkgInDir(sdkRepoBuildDir);
         if (found) {
@@ -411,8 +411,8 @@ async function resolveSdkPath(
     return undefined;
 }
 
-const SDK_PACKAGE_NAME = "Microsoft.Azure.Connectors.Sdk";
-const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Azure.Connectors.Sdk"];
+const SDK_PACKAGE_NAME = "Azure.Connectors.Sdk";
+const SDK_PACKAGE_NAMES = [SDK_PACKAGE_NAME, "Microsoft.Azure.Connectors.Sdk"];
 const SDK_PACKAGE_PREFIXES_LOWER = SDK_PACKAGE_NAMES.map((name) => name.toLowerCase() + "/");
 const SDK_PACKAGE_REF_PATTERNS = SDK_PACKAGE_NAMES.map((name) => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

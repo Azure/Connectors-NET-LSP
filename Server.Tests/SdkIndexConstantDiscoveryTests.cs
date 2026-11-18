@@ -94,7 +94,7 @@ public class SdkIndexConstantDiscoveryTests
 
         var office365 = SdkIndex.ConnectorNameConstants.FirstOrDefault(c => c.Value == "office365");
         Assert.IsNotNull(office365);
-        Assert.AreEqual("Office365", office365.FieldName);
+        Assert.AreEqual("Office365Outlook", office365.FieldName);
         Assert.AreEqual("ConnectorNames", office365.ClassName);
     }
 
@@ -132,8 +132,11 @@ public class SdkIndexConstantDiscoveryTests
         var ops = SdkIndex.GetTriggerOperations("office365");
 
         Assert.IsTrue(ops.Length > 0, "Should have office365 operations");
+        var onNewEmail = ops.FirstOrDefault(o => o.FieldName == "OnNewEmail");
+        Assert.IsNotNull(onNewEmail, "Should expose Office365TriggerOperations.OnNewEmail");
+        Assert.AreEqual("OnNewEmailV3", onNewEmail.Value);
+
         var opNames = ops.Select(o => o.Value).ToList();
-        CollectionAssert.Contains(opNames, "OnNewEmail");
         CollectionAssert.Contains(opNames, "OnUpcomingEventsV3");
     }
 
