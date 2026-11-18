@@ -132,7 +132,7 @@ public class SdkIndexConstantDiscoveryTests
         var ops = SdkIndex.GetTriggerOperations("office365");
 
         Assert.IsTrue(ops.Length > 0, "Should have office365 operations");
-        var onNewEmail = ops.FirstOrDefault(o => o.FieldName == "OnNewEmail");
+        var onNewEmail = ops.FirstOrDefault(operation => operation.FieldName == "OnNewEmail");
         Assert.IsNotNull(onNewEmail, "Should expose Office365TriggerOperations.OnNewEmail");
         Assert.AreEqual("OnNewEmailV3", onNewEmail.Value);
 
