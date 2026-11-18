@@ -51,5 +51,14 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
 
+    # SdkIndexConstantDiscoveryTests index the real SDK package; without it they are inconclusive.
+    - name: Stage Connectors SDK package
+      shell: bash
+      run: |
+        mkdir -p SDK
+        curl --fail --silent --show-error --location \
+          https://api.nuget.org/v3-flatcontainer/azure.connectors.sdk/1.0.0/azure.connectors.sdk.1.0.0.nupkg \
+          --output SDK/Azure.Connectors.Sdk.1.0.0.nupkg
+
     - name: Test
       run: dotnet test --no-build --configuration Release --verbosity normal

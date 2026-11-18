@@ -14,6 +14,8 @@ This guide walks you through:
 4. Installing the VS Code extension
 5. Opening a connector project and verifying LSP features (hover, completions, CodeLens)
 
+> **Using the published package:** `Azure.Connectors.Sdk` 1.0.0 is available on NuGet.org. When the test project references it and has been restored with `dotnet restore`, the extension resolves the SDK from `obj/project.assets.json`, so Steps 1 and 2 are only needed to test an unreleased SDK build.
+
 The guide uses the [Connectors-NET-SDK](https://github.com/Azure/Connectors-NET-SDK) as the SDK source and the [Connectors-NET-Samples](https://github.com/Azure/Connectors-NET-Samples) as the test project. You can substitute any project that references the Connectors SDK.
 
 ---
@@ -42,7 +44,7 @@ your-workspace/
 ```bash
 git clone https://github.com/Azure/Connectors-NET-LSP.git
 git clone https://github.com/Azure/Connectors-NET-SDK.git
-git clone https://github.com/Azure/Connectors-NET-LSP.git
+git clone https://github.com/Azure/Connectors-NET-Samples.git
 ```
 
 ---
@@ -53,13 +55,13 @@ The Connectors SDK project has `GeneratePackageOnBuild=true`, so a Release build
 
 ```bash
 cd Connectors-NET-SDK
-dotnet build src/Microsoft.Azure.Connectors.Sdk/Microsoft.Azure.Connectors.Sdk.csproj -c Release
+dotnet build src/Azure.Connectors.Sdk/Azure.Connectors.Sdk.csproj -c Release
 ```
 
 **Output:**
 
 ```text
-src/Microsoft.Azure.Connectors.Sdk/bin/Release/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
+src/Azure.Connectors.Sdk/bin/Release/Azure.Connectors.Sdk.1.0.0.nupkg
 ```
 
 > **Tip:** You do NOT need to publish this package to a NuGet feed. The LSP server loads `.nupkg` files directly from disk.
@@ -73,7 +75,7 @@ The VS Code extension discovers `.nupkg` files from `SDK/` under the opened work
 not from the LSP repo itself.
 
 ```bash
-cp Connectors-NET-SDK/src/Microsoft.Azure.Connectors.Sdk/bin/Release/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg Connectors-NET-Samples/SDK/
+cp Connectors-NET-SDK/src/Azure.Connectors.Sdk/bin/Release/Azure.Connectors.Sdk.1.0.0.nupkg Connectors-NET-Samples/SDK/
 ```
 
 Alternatively, set the `connectorSdk.sdkNupkgPath` VS Code setting to the absolute path of the `.nupkg`.
@@ -87,7 +89,7 @@ ls Connectors-NET-Samples/SDK/*.nupkg
 You should see at least:
 
 ```text
-Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
+Azure.Connectors.Sdk.1.0.0.nupkg
 ```
 
 > **How auto-discovery works:** Both the server (`Program.cs → TryFindNupkgInSdkFolder`) and the extension (`extension.ts → resolveSdkNupkgPath`) search for `.nupkg` files in `SDK/` directories. When multiple packages exist, the most recently modified file is selected. You can also bypass auto-discovery with the `--sdk` CLI flag or the `connectorSdk.sdkNupkgPath` VS Code setting.
@@ -297,7 +299,7 @@ The extension's output channel (**Connectors SDK LSP**) shows diagnostic informa
 
 ```text
 Starting LSP server from: .../Server/bin/Debug/net8.0/SdkLspServer.dll
-SDK .nupkg: .../SDK/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg
+SDK .nupkg: .../SDK/Azure.Connectors.Sdk.1.0.0.nupkg
 Initialization: apiConfig=none, connections=2
 LSP server started successfully.
 ```
@@ -328,7 +330,7 @@ The server couldn't find or index the `.nupkg`. This commonly happens in the Ext
 
 ```bash
 mkdir -p Connectors-NET-Samples/SDK
-cp connector-sdk-lsp/SDK/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg Connectors-NET-Samples/SDK/
+cp connector-sdk-lsp/SDK/Azure.Connectors.Sdk.1.0.0.nupkg Connectors-NET-Samples/SDK/
 ```
 
 Then reload the Extension Development Host (**Ctrl+Shift+P** → "Developer: Reload Window").
@@ -337,7 +339,7 @@ Then reload the Extension Development Host (**Ctrl+Shift+P** → "Developer: Rel
 
 ```json
 {
-  "connectorSdk.sdkNupkgPath": "Q:/path/to/connector-sdk-lsp/SDK/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg"
+  "connectorSdk.sdkNupkgPath": "Q:/path/to/connector-sdk-lsp/SDK/Azure.Connectors.Sdk.1.0.0.nupkg"
 }
 ```
 
@@ -364,10 +366,10 @@ When you make changes to the Connectors SDK source:
 ```bash
 # 1. Rebuild the SDK package
 cd Connectors-NET-SDK
-dotnet build src/Microsoft.Azure.Connectors.Sdk/Microsoft.Azure.Connectors.Sdk.csproj -c Release
+dotnet build src/Azure.Connectors.Sdk/Azure.Connectors.Sdk.csproj -c Release
 
 # 2. Copy the updated package
-cp src/Microsoft.Azure.Connectors.Sdk/bin/Release/Microsoft.Azure.Connectors.Sdk.1.0.0.nupkg ../connector-sdk-lsp/SDK/
+cp src/Azure.Connectors.Sdk/bin/Release/Azure.Connectors.Sdk.1.0.0.nupkg ../connector-sdk-lsp/SDK/
 
 # 3. Restart the LSP server (in the Extension Development Host)
 #    Ctrl+Shift+P → "Connectors SDK: Restart Language Server"
@@ -406,7 +408,7 @@ Then reload the Extension Development Host window.
 
 | Task | Command |
 |------|---------|
-| Build SDK package | `dotnet build src/.../Microsoft.Azure.Connectors.Sdk.csproj -c Release` |
+| Build SDK package | `dotnet build src/Azure.Connectors.Sdk/Azure.Connectors.Sdk.csproj -c Release` |
 | Build LSP server | `dotnet build Server/SdkLspServer.csproj` |
 | Run server standalone | `dotnet run --project Server -- --sdk SDK/your-package.nupkg` |
 | Install extension deps | `cd vscode-extension && npm install` |
