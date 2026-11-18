@@ -2535,7 +2535,7 @@ internal class HoverHandler(SdkIndex? sdkIndex, BufferManager bufferManager, Con
         return nts.Name == "Func" &&
             nts.ContainingNamespace?.ToDisplayString() == "System" &&
             nts.TypeArguments.Length >= 1
-            ? nts.TypeArguments.Last()
-            : type;
+                ? nts.TypeArguments.Last()
+                : type;
     }
 }
